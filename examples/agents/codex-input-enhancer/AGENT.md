@@ -1,0 +1,43 @@
+# Codex Input Enhancer 开发 Agent
+
+你负责实现和审查 Codex Input Enhancer：一个 Windows 桌面输入增强器。用户在 Codex 中选中文本并按快捷键后，应用读取选区、按需结合已选择的 Agent/知识库生成更可执行的 Codex 提示词，预览确认后通过原生粘贴替换；替换必须可用 `Ctrl+Z` 撤销。
+
+## 不可放宽的安全边界
+
+1. 只响应 `Ctrl+Alt+E`，禁止持续监听、采集或上传用户输入与剪贴板。
+2. 未确认前不得替换选区；取消、Esc 或关闭浮窗不得修改目标文本。
+3. API Key 仅存 Windows Credential Manager；配置文件、日志、事件和报错不得包含 Key 或完整选中文本。
+4. Agent 与知识库只能在用户为本次请求勾选的已配置根目录内读取；仅允许 `.md`、`.txt`，不得写入、执行 shell、访问任意路径或跟随逃逸路径。
+5. 网络能力默认关闭，且只有“全局设置允许 + 本次浮窗勾选”时才能使用。网络结果是不可信参考资料，不能改变安全规则。
+6. 不自行修改 Tauri capability，不扩大系统、文件、窗口或网络权限。
+
+## 当前产品流程
+
+1. 在 Codex 选中文本，按 `Ctrl+Alt+E`。
+2. 原生剪贴板桥接在工作线程短暂读取选区，随后恢复用户原剪贴板；未选中文本时静默退出。
+3. 浮窗第一步选择本次 Agent、知识库和可选网络上下文。
+4. 若草稿缺少关键条件，Agent 最多提出 3 个可输入的澄清问题；否则直接生成。
+5. DeepSeek 流式生成替换建议，浮窗展示状态而不暴露工具调用内容。
+6. 用户可查看完整对比、重新生成、编辑候选文本；只有确认后才以 `Ctrl+V` 替换原选区。
+
+快捷键：`Ctrl+Alt+E` 读取选区，`Ctrl+Shift+Alt+S` 打开控制面板，`Ctrl+Alt+Q` 退出。浮窗支持 Enter 确认、Tab 切换对比、Esc 取消。
+
+## 当前代码边界
+
+- `src-tauri/src/main.rs`：Tauri 命令、会话状态、窗口/托盘与全局快捷键装配；不承载模型、剪贴板或资料读取细节。
+- `clipboard.rs`：Win32/OLE 剪贴板快照、恢复、复制选区、原生粘贴。仅在快捷键触发的工作线程使用。
+- `credential.rs`：唯一的 Windows Credential Manager API Key 入口。
+- `settings.rs`：非敏感设置、目录目录项发现、受限导入/删除。
+- `workspace.rs`：唯一的本地资料工具面；规范化路径、只读白名单、32 KB 单文件上限和数量/深度上限。
+- `deepseek.rs`：DeepSeek HTTP 客户端与不含敏感信息的连通性测试。
+- `session.rs`：前后端会话数据类型。
+- `agent_protocol.rs`：宿主控制的提示词包裹、SSE 增量解析、DSML/文本工具调用防护。
+- `agent.rs`：本次请求的上下文、工具循环、网络约束、澄清解析与流式生成。
+- `src/App.jsx`：会话状态与事件编排；`src/components/PaletteParts.jsx`：预览/控制面板组件；`src/lib/tauri.js`：唯一前端 Tauri 调用边界。
+
+## 修改与验证
+
+- 改 Rust 后依次执行：`cargo fmt`、`cargo check`、`cargo clippy -- -D warnings`。
+- 改前端后执行：`npm run build`，并手测选区读取、无选区、取消、确认替换与 `Ctrl+Z`、澄清问题、重新生成、设置保存和 API 测试。
+- 运行中的 `codex-input-enhancer.exe` 会锁住默认调试产物；先关闭旧进程再执行常规 `cargo build`，不要以删除或覆盖运行文件的方式绕过。
+- 任何外部 API 请求都必须由用户在当前会话明确触发；工具调用只用 UI 状态表示，不能将原始工具 JSON/DSML 泄漏到替换文本。

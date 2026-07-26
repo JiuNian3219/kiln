@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Instant;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
@@ -14,26 +16,33 @@ mod agent_protocol;
 mod clipboard;
 mod credential;
 mod deepseek;
+mod diagnostics;
 mod session;
 mod settings;
 mod workspace;
 
 use credential::WindowsCredentialStore;
+use diagnostics::{Diagnostics, DiagnosticsPayload};
 use session::{ClarificationPayload, SessionInput};
 use settings::{
-    CatalogEntry, CatalogRepository, Settings, SettingsInput, SettingsPayload, SettingsRepository,
-    discover_catalog,
+    CatalogEntry, CatalogRepository, Combination, CombinationInput, FeatureAndShortcutSaveResult,
+    FeatureAndShortcutSettings, Settings, SettingsInput, SettingsPayload, SettingsRepository,
+    discover_catalog, discover_knowledge_bases, feature_enabled, knowledge_base_index_candidates,
+    knowledge_base_index_material, save_generated_knowledge_base_index, shortcut_for,
+    validate_shortcut,
 };
 
 struct AppState {
+    diagnostics: Diagnostics,
     pending: Mutex<Option<PendingSession>>,
     reference_text: Mutex<Option<String>>,
-    reference_shortcut: Mutex<String>,
+    registered_shortcuts: Mutex<Vec<String>>,
     settings: Mutex<Settings>,
 }
 
 #[derive(Clone)]
 struct PendingSession {
+    id: String,
     target: isize,
     original: String,
     reference_text: Option<String>,
@@ -48,6 +57,8 @@ struct PreviewPayload {
     knowledge_bases: Vec<CatalogEntry>,
     selected_agent_id: String,
     selected_knowledge_base_ids: Vec<String>,
+    combinations: Vec<Combination>,
+    selected_combination_id: String,
     use_agent: bool,
     use_knowledge_base: bool,
     use_network: bool,
@@ -60,14 +71,16 @@ impl Default for AppState {
     fn default() -> Self {
         let settings = SettingsRepository::load().unwrap_or_default();
         Self {
+            diagnostics: Diagnostics::new(),
             pending: Mutex::new(None),
             reference_text: Mutex::new(None),
-            reference_shortcut: Mutex::new(String::new()),
+            registered_shortcuts: Mutex::new(Vec::new()),
             settings: Mutex::new(settings),
         }
     }
 }
 
+#[allow(clippy::obfuscated_if_else)]
 fn preview_payload(
     original: String,
     replacement: String,
@@ -75,36 +88,68 @@ fn preview_payload(
     reference_text: Option<String>,
 ) -> PreviewPayload {
     let agents = discover_catalog(&settings.agents_root, "AGENT.md");
-    let knowledge_bases = discover_catalog(&settings.knowledge_bases_root, "INDEX.md");
-    let selected_agent_id = if agents
+    let knowledge_bases = discover_knowledge_bases(settings);
+    let combinations = settings
+        .combinations
         .iter()
-        .any(|entry| entry.id == settings.default_agent)
-    {
-        settings.default_agent.clone()
-    } else {
-        String::new()
-    };
-    let selected_knowledge_base_ids = if knowledge_bases
+        .filter(|combination| {
+            agents.iter().any(|agent| agent.id == combination.agent_id)
+                && !combination.knowledge_base_ids.is_empty()
+                && combination.knowledge_base_ids.iter().all(|id| {
+                    knowledge_bases.iter().any(|base| {
+                        base.id == *id && base.index_status.as_deref() != Some("缺少 INDEX")
+                    })
+                })
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let selected_combination_id = combinations
         .iter()
-        .any(|entry| entry.id == settings.default_knowledge_base)
-    {
-        vec![settings.default_knowledge_base.clone()]
-    } else {
-        Vec::new()
-    };
+        .any(|item| item.id == settings.default_combination)
+        .then_some(settings.default_combination.clone())
+        .unwrap_or_default();
+    let selected = combinations
+        .iter()
+        .find(|item| item.id == selected_combination_id);
+    let selected_agent_id = selected
+        .map(|item| item.agent_id.clone())
+        .unwrap_or_default();
+    let selected_knowledge_base_ids = selected
+        .map(|item| item.knowledge_base_ids.clone())
+        .unwrap_or_default();
     PreviewPayload {
         original,
         replacement,
         use_agent: !selected_agent_id.is_empty(),
         use_knowledge_base: !selected_knowledge_base_ids.is_empty(),
-        use_network: false,
+        use_network: settings.allow_network,
         network_available: settings.allow_network,
         agents,
         knowledge_bases,
         selected_agent_id,
         selected_knowledge_base_ids,
+        combinations,
+        selected_combination_id,
         reference_active: reference_text.is_some(),
         reference_text,
+    }
+}
+
+fn size_bucket(size: usize) -> &'static str {
+    match size {
+        0..=99 => "0-99",
+        100..=999 => "100-999",
+        1_000..=9_999 => "1k-9k",
+        _ => "10k+",
+    }
+}
+
+fn safe_client_error_type(error_type: Option<&str>) -> &'static str {
+    match error_type {
+        Some("RangeError") => "RangeError",
+        Some("TypeError") => "TypeError",
+        Some("Error") => "Error",
+        _ => "Unknown",
     }
 }
 
@@ -148,7 +193,7 @@ fn show_reference_toast(app: &AppHandle) -> std::result::Result<(), String> {
     }
     let toast =
         WebviewWindowBuilder::new(app, "reference-toast", WebviewUrl::App("toast.html".into()))
-            .title("Reference saved")
+            .title("参考文本已保存")
             .inner_size(300.0, 50.0)
             .decorations(false)
             .transparent(true)
@@ -177,13 +222,15 @@ async fn save_reference_inner(
     app: &AppHandle,
     state: &AppState,
 ) -> std::result::Result<(), String> {
-    let mode = state
+    let settings = state
         .settings
         .lock()
         .map_err(|_| "Settings lock failed.".to_string())?
-        .reference_capture_mode
         .clone();
-    let (text, show_toast) = capture_reference_text(&mode).await?;
+    if !feature_enabled(&settings, "reference-context") {
+        return Ok(());
+    }
+    let (text, show_toast) = capture_reference_text(&settings.reference_capture_mode).await?;
     let Some(text) = text else {
         return Ok(());
     };
@@ -200,39 +247,156 @@ async fn save_reference_inner(
     Ok(())
 }
 
-fn register_reference_shortcut(
-    app: &AppHandle,
-    shortcut: String,
-) -> std::result::Result<(), String> {
-    if !matches!(shortcut.as_str(), "Ctrl+Shift+T" | "Ctrl+Alt+T") {
-        return Err("Unsupported reference shortcut.".to_string());
-    }
-    let state = app.state::<AppState>();
-    let mut current = state
-        .reference_shortcut
-        .lock()
-        .map_err(|_| "Reference shortcut lock failed.".to_string())?;
-    if *current == shortcut {
-        return Ok(());
-    }
-    if !current.is_empty() {
-        let _ = app.global_shortcut().unregister(current.as_str());
-    }
-    let app_handle = app.clone();
-    app.global_shortcut()
-        .on_shortcut(shortcut.as_str(), move |_, _, event| {
-            if event.state() != ShortcutState::Pressed {
-                return;
-            }
-            let app_handle = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
+fn trigger_read_selection(app_handle: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let captured = match tauri::async_runtime::spawn_blocking(
+            clipboard::capture_selection_on_worker,
+        )
+        .await
+        {
+            Ok(Ok(captured)) => Ok(captured),
+            Ok(Err(error)) => Err(error.message().to_string()),
+            Err(error) => Err(format!("Selection worker failed: {error}")),
+        };
+        let window = match app_handle.get_webview_window("main") {
+            Some(window) => window,
+            None => return,
+        };
+        match captured {
+            Ok(Some(captured)) => {
+                let target = captured.target;
+                let original = captured.text;
                 let state = app_handle.state::<AppState>();
-                let _ = save_reference_inner(&app_handle, &state).await;
-            });
-        })
-        .map_err(|error| error.to_string())?;
-    *current = shortcut;
+                let reference_text = state
+                    .reference_text
+                    .lock()
+                    .expect("Reference lock failed")
+                    .take();
+                *state.pending.lock().expect("Pending session lock failed") =
+                    Some(PendingSession {
+                        id: state.diagnostics.new_session_id(),
+                        target,
+                        original: original.clone(),
+                        reference_text: reference_text.clone(),
+                    });
+                let session_id = state
+                    .pending
+                    .lock()
+                    .expect("Pending session lock failed")
+                    .as_ref()
+                    .map(|session| session.id.clone());
+                state.diagnostics.info(
+                    "selection.captured",
+                    session_id.as_deref(),
+                    serde_json::json!({ "selectionSizeBucket": size_bucket(original.len()) }),
+                );
+                let settings = match state.settings.lock() {
+                    Ok(settings) => settings.clone(),
+                    Err(_) => {
+                        let _ = window.emit("capture-error", "Settings lock failed.");
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                        return;
+                    }
+                };
+                let payload = preview_payload(original, String::new(), &settings, reference_text);
+                let _ = show_preview(&window, payload);
+            }
+            Ok(None) => {}
+            Err(error) => {
+                app_handle.state::<AppState>().diagnostics.error(
+                    "selection.capture_failed",
+                    None,
+                    "E-SELECTION-CAPTURE-001",
+                    serde_json::json!({ "errorType": "clipboard" }),
+                );
+                let _ = window.emit("capture-error", error);
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+    });
+}
+
+fn reregister_shortcuts(app: &AppHandle, settings: &Settings) -> std::result::Result<(), String> {
+    let mut actions = vec![
+        (shortcut_for(settings, "read-selection"), "read-selection"),
+        (
+            shortcut_for(settings, "open-control-panel"),
+            "open-control-panel",
+        ),
+        (shortcut_for(settings, "quit-app"), "quit-app"),
+    ];
+    if feature_enabled(settings, "reference-context") {
+        actions.push((settings.reference_shortcut.clone(), "reference-context"));
+    }
+    unregister_global_shortcuts(app)?;
+    let mut resolved = HashMap::new();
+    for (shortcut, action) in actions {
+        resolved.insert(shortcut, action);
+    }
+    for (shortcut, action) in &resolved {
+        let shortcut_key = shortcut.clone();
+        let action = *action;
+        app.global_shortcut()
+            .on_shortcut(shortcut.as_str(), move |app, _, event| {
+                if event.state() != ShortcutState::Pressed {
+                    return;
+                }
+                match action {
+                    "read-selection" => trigger_read_selection(app.clone()),
+                    "open-control-panel" => {
+                        let _ = show_settings(app);
+                    }
+                    "quit-app" => app.exit(0),
+                    "reference-context" => {
+                        let app_handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let state = app_handle.state::<AppState>();
+                            let _ = save_reference_inner(&app_handle, &state).await;
+                        });
+                    }
+                    _ => {}
+                }
+            })
+            .map_err(|error| format!("Unable to register {shortcut_key}: {error}"))?;
+        app.state::<AppState>()
+            .registered_shortcuts
+            .lock()
+            .map_err(|_| "Shortcut lock failed.".to_string())?
+            .push(shortcut.clone());
+    }
     Ok(())
+}
+
+fn unregister_global_shortcuts(app: &AppHandle) -> std::result::Result<(), String> {
+    let state = app.state::<AppState>();
+    let mut registered = state
+        .registered_shortcuts
+        .lock()
+        .map_err(|_| "Shortcut lock failed.".to_string())?;
+    for shortcut in registered.drain(..) {
+        let _ = app.global_shortcut().unregister(shortcut.as_str());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn suspend_global_shortcuts(app: AppHandle) -> std::result::Result<(), String> {
+    unregister_global_shortcuts(&app)
+}
+
+#[tauri::command]
+fn resume_global_shortcuts(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> std::result::Result<(), String> {
+    let settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?
+        .clone();
+    reregister_shortcuts(&app, &settings)
 }
 
 #[tauri::command]
@@ -247,14 +411,44 @@ fn accept_replacement(
         .map_err(|_| "Pending session lock failed.".to_string())?
         .take()
         .ok_or_else(|| "No pending selection.".to_string())?;
+    state.diagnostics.info(
+        "selection.replace_requested",
+        Some(&session.id),
+        serde_json::json!({ "replacementSizeBucket": size_bucket(replacement.len()) }),
+    );
     let replacement = replacement.trim();
     if replacement.is_empty() {
+        state.diagnostics.error(
+            "selection.replace_rejected",
+            Some(&session.id),
+            "E-REPLACE-EMPTY-001",
+            serde_json::json!({}),
+        );
         return Err("Replacement text cannot be empty.".to_string());
     }
     if replacement.len() > 100_000 {
+        state.diagnostics.error(
+            "selection.replace_rejected",
+            Some(&session.id),
+            "E-REPLACE-LIMIT-001",
+            serde_json::json!({}),
+        );
         return Err("Replacement text is too large.".to_string());
     }
-    clipboard::replace_selection(session.target, replacement).map_err(|error| error.to_string())?;
+    if let Err(error) = clipboard::replace_selection(session.target, replacement) {
+        state.diagnostics.error(
+            "selection.replace_failed",
+            Some(&session.id),
+            "E-REPLACE-FOCUS-001",
+            serde_json::json!({ "errorType": "clipboard" }),
+        );
+        return Err(error.to_string());
+    }
+    state.diagnostics.info(
+        "selection.replace_completed",
+        Some(&session.id),
+        serde_json::json!({}),
+    );
     app.get_webview_window("main")
         .ok_or_else(|| "Preview window is unavailable.".to_string())?
         .hide()
@@ -263,11 +457,18 @@ fn accept_replacement(
 
 #[tauri::command]
 fn cancel_preview(state: State<'_, AppState>) -> std::result::Result<(), String> {
-    state
+    if let Some(session) = state
         .pending
         .lock()
         .map_err(|_| "Pending session lock failed.".to_string())?
-        .take();
+        .take()
+    {
+        state.diagnostics.info(
+            "session.cancelled",
+            Some(&session.id),
+            serde_json::json!({}),
+        );
+    }
     Ok(())
 }
 
@@ -321,14 +522,43 @@ async fn analyze_session(
         .use_reference
         .then_some(session.reference_text)
         .flatten();
-    agent::analyze(
+    let started = Instant::now();
+    state.diagnostics.info(
+        "agent.analysis_started",
+        Some(&session.id),
+        serde_json::json!({
+            "usesAgent": input.use_agent,
+            "knowledgeBaseCount": input.knowledge_base_ids.len(),
+            "usesReference": input.use_reference,
+        }),
+    );
+    let result = agent::analyze(
         settings,
         session.original,
         &input,
         reference.as_deref(),
         &window,
+        &state.diagnostics,
+        &session.id,
     )
-    .await
+    .await;
+    match &result {
+        Ok(payload) => state.diagnostics.info(
+            "agent.analysis_completed",
+            Some(&session.id),
+            serde_json::json!({
+                "questionCount": payload.questions.len(),
+                "durationMs": started.elapsed().as_millis(),
+            }),
+        ),
+        Err(_) => state.diagnostics.error(
+            "agent.analysis_failed",
+            Some(&session.id),
+            "E-ANALYZE-001",
+            serde_json::json!({ "durationMs": started.elapsed().as_millis() }),
+        ),
+    }
+    result
 }
 
 #[tauri::command]
@@ -351,24 +581,46 @@ async fn generate_replacement(
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "Preview window is unavailable.".to_string())?;
-    let event = if input.candidate {
-        "regeneration-chunk"
-    } else {
-        "generation-chunk"
-    };
     let reference = input
         .use_reference
         .then_some(session.reference_text)
         .flatten();
+    let started = Instant::now();
+    state.diagnostics.info(
+        "agent.generation_started",
+        Some(&session.id),
+        serde_json::json!({
+            "candidate": input.candidate,
+            "answerCount": input.answers.len(),
+            "knowledgeBaseCount": input.knowledge_base_ids.len(),
+        }),
+    );
     let result = agent::generate(
         settings,
         session.original,
         &input,
         reference.as_deref(),
         &window,
-        event,
+        &state.diagnostics,
+        &session.id,
     )
     .await;
+    match &result {
+        Ok(replacement) => state.diagnostics.info(
+            "agent.generation_completed",
+            Some(&session.id),
+            serde_json::json!({
+                "replacementSizeBucket": size_bucket(replacement.len()),
+                "durationMs": started.elapsed().as_millis(),
+            }),
+        ),
+        Err(_) => state.diagnostics.error(
+            "agent.generation_failed",
+            Some(&session.id),
+            "E-GENERATE-001",
+            serde_json::json!({ "durationMs": started.elapsed().as_millis() }),
+        ),
+    }
     if let Ok(mut pending) = state.pending.lock()
         && let Some(pending) = pending.as_mut()
     {
@@ -396,6 +648,120 @@ fn get_settings(state: State<'_, AppState>) -> std::result::Result<SettingsPaylo
 }
 
 #[tauri::command]
+fn get_feature_and_shortcut_settings(
+    state: State<'_, AppState>,
+) -> std::result::Result<FeatureAndShortcutSettings, String> {
+    let settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    Ok(FeatureAndShortcutSettings {
+        feature_toggles: settings.feature_toggles.clone(),
+        shortcuts: settings.shortcuts.clone(),
+        reference_shortcut: settings.reference_shortcut.clone(),
+        reference_capture_mode: settings.reference_capture_mode.clone(),
+    })
+}
+
+#[tauri::command]
+fn save_feature_and_shortcut_settings(
+    input: FeatureAndShortcutSettings,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> std::result::Result<FeatureAndShortcutSaveResult, String> {
+    let mut field_errors = HashMap::new();
+    for key in ["read-selection", "open-control-panel", "quit-app"] {
+        let value = input
+            .shortcuts
+            .get(key)
+            .map(String::as_str)
+            .unwrap_or_default();
+        if let Err(error) = validate_shortcut(value) {
+            field_errors.insert(key.to_string(), error);
+        }
+    }
+    let reference_enabled = input
+        .feature_toggles
+        .get("reference-context")
+        .copied()
+        .unwrap_or(true);
+    if reference_enabled && let Err(error) = validate_shortcut(&input.reference_shortcut) {
+        field_errors.insert("referenceShortcut".to_string(), error);
+    }
+    if !field_errors.is_empty() {
+        return Ok(FeatureAndShortcutSaveResult {
+            success: false,
+            field_errors,
+            settings: input,
+        });
+    }
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    settings.feature_toggles = input.feature_toggles.clone();
+    settings.shortcuts = input.shortcuts.clone();
+    settings.reference_shortcut = input.reference_shortcut.trim().to_string();
+    settings.reference_capture_mode = if input.reference_capture_mode == "clipboard" {
+        "clipboard".to_string()
+    } else {
+        "selection".to_string()
+    };
+    settings.allow_network = feature_enabled(&settings, "network-search");
+    reregister_shortcuts(&app, &settings)?;
+    SettingsRepository::save(&settings)?;
+    state
+        .diagnostics
+        .info("features_and_shortcuts.saved", None, serde_json::json!({}));
+    Ok(FeatureAndShortcutSaveResult {
+        success: true,
+        field_errors,
+        settings: FeatureAndShortcutSettings {
+            feature_toggles: settings.feature_toggles.clone(),
+            shortcuts: settings.shortcuts.clone(),
+            reference_shortcut: settings.reference_shortcut.clone(),
+            reference_capture_mode: settings.reference_capture_mode.clone(),
+        },
+    })
+}
+
+#[tauri::command]
+fn get_diagnostics(state: State<'_, AppState>) -> DiagnosticsPayload {
+    state.diagnostics.payload()
+}
+
+#[tauri::command]
+fn clear_diagnostics(state: State<'_, AppState>) -> DiagnosticsPayload {
+    state.diagnostics.clear();
+    state.diagnostics.payload()
+}
+
+/// Receives only a small, fixed client-side event vocabulary. Never accept an
+/// arbitrary JavaScript error message because it might include user text.
+#[tauri::command]
+fn report_client_diagnostic(kind: String, error_type: Option<String>, state: State<'_, AppState>) {
+    match kind.as_str() {
+        "directory_picker_requested" => {
+            state
+                .diagnostics
+                .info("directory_picker.requested", None, serde_json::json!({}))
+        }
+        "directory_picker_cancelled" => {
+            state
+                .diagnostics
+                .info("directory_picker.cancelled", None, serde_json::json!({}))
+        }
+        "directory_picker_failed" => state.diagnostics.error(
+            "directory_picker.failed",
+            None,
+            "E-DIALOG-OPEN-001",
+            serde_json::json!({ "errorType": safe_client_error_type(error_type.as_deref()) }),
+        ),
+        _ => {}
+    }
+}
+
+#[tauri::command]
 fn import_agent(
     source_path: String,
     state: State<'_, AppState>,
@@ -405,13 +771,13 @@ fn import_agent(
         .lock()
         .map_err(|_| "Settings lock failed.".to_string())?
         .clone();
-    CatalogRepository::import(&settings.agents_root, &source_path, "AGENT.md", "Agent")?;
+    CatalogRepository::import_agent_file(&settings.agents_root, &source_path)?;
     Ok(SettingsRepository::payload(settings))
 }
 
 #[tauri::command]
-fn import_knowledge_base(
-    source_path: String,
+fn import_knowledge_bases(
+    source_paths: Vec<String>,
     state: State<'_, AppState>,
 ) -> std::result::Result<SettingsPayload, String> {
     let settings = state
@@ -419,12 +785,7 @@ fn import_knowledge_base(
         .lock()
         .map_err(|_| "Settings lock failed.".to_string())?
         .clone();
-    CatalogRepository::import(
-        &settings.knowledge_bases_root,
-        &source_path,
-        "INDEX.md",
-        "knowledge base",
-    )?;
+    CatalogRepository::import_knowledge_bases(&settings.knowledge_bases_root, &source_paths)?;
     Ok(SettingsRepository::payload(settings))
 }
 
@@ -437,11 +798,16 @@ fn delete_agent(
         .settings
         .lock()
         .map_err(|_| "Settings lock failed.".to_string())?;
-    CatalogRepository::delete(&settings.agents_root, &id, "AGENT.md", "Agent")?;
-    if settings.default_agent == id {
-        settings.default_agent.clear();
-        SettingsRepository::save(&settings)?;
+    CatalogRepository::delete_directory(&settings.agents_root, &id, "Agent")?;
+    settings.combinations.retain(|item| item.agent_id != id);
+    if !settings
+        .combinations
+        .iter()
+        .any(|item| item.id == settings.default_combination)
+    {
+        settings.default_combination.clear();
     }
+    SettingsRepository::save(&settings)?;
     Ok(SettingsRepository::payload(settings.clone()))
 }
 
@@ -454,16 +820,174 @@ fn delete_knowledge_base(
         .settings
         .lock()
         .map_err(|_| "Settings lock failed.".to_string())?;
-    CatalogRepository::delete(
-        &settings.knowledge_bases_root,
-        &id,
-        "INDEX.md",
-        "knowledge base",
-    )?;
-    if settings.default_knowledge_base == id {
-        settings.default_knowledge_base.clear();
-        SettingsRepository::save(&settings)?;
+    CatalogRepository::delete_directory(&settings.knowledge_bases_root, &id, "知识库")?;
+    settings.knowledge_base_indexes.remove(&id);
+    settings
+        .combinations
+        .retain(|item| !item.knowledge_base_ids.iter().any(|base| base == &id));
+    if !settings
+        .combinations
+        .iter()
+        .any(|item| item.id == settings.default_combination)
+    {
+        settings.default_combination.clear();
     }
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+fn save_combination(
+    input: CombinationInput,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    let name = input.name.trim();
+    if name.is_empty() || input.agent_id.trim().is_empty() || input.knowledge_base_ids.is_empty() {
+        return Err("组合必须包含名称、一个 Agent 和至少一个知识库。".to_string());
+    }
+    let agents = discover_catalog(&settings.agents_root, "AGENT.md");
+    let knowledge_bases = discover_knowledge_bases(&settings);
+    if !agents.iter().any(|item| item.id == input.agent_id)
+        || input.knowledge_base_ids.iter().any(|id| {
+            !knowledge_bases
+                .iter()
+                .any(|item| item.id == *id && item.index_status.as_deref() != Some("缺少 INDEX"))
+        })
+    {
+        return Err("组合引用了不可用或缺少 INDEX 的资料。".to_string());
+    }
+    let id = if input.id.trim().is_empty() {
+        format!(
+            "combo-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        )
+    } else {
+        input.id
+    };
+    let combination = Combination {
+        id: id.clone(),
+        name: name.to_string(),
+        agent_id: input.agent_id,
+        knowledge_base_ids: input.knowledge_base_ids,
+    };
+    if let Some(existing) = settings.combinations.iter_mut().find(|item| item.id == id) {
+        *existing = combination;
+    } else {
+        settings.combinations.push(combination);
+    }
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+fn delete_combination(
+    id: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    settings.combinations.retain(|item| item.id != id);
+    if settings.default_combination == id {
+        settings.default_combination.clear();
+    }
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+fn set_default_combination(
+    id: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    if !id.is_empty() && !settings.combinations.iter().any(|item| item.id == id) {
+        return Err("组合不存在。".to_string());
+    }
+    settings.default_combination = id;
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+fn get_knowledge_base_index_candidates(
+    id: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<Vec<String>, String> {
+    let settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    knowledge_base_index_candidates(&settings, &id)
+}
+
+#[tauri::command]
+fn set_knowledge_base_index(
+    id: String,
+    mode: String,
+    manual_path: Option<String>,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    if mode == "manual" {
+        let path = manual_path.unwrap_or_default();
+        if !knowledge_base_index_candidates(&settings, &id)?
+            .iter()
+            .any(|item| item == &path)
+        {
+            return Err("请选择知识库内的 Markdown 或文本文件作为索引。".to_string());
+        }
+        settings.knowledge_base_indexes.insert(
+            id,
+            settings::KnowledgeBaseIndex {
+                mode,
+                manual_path: path,
+            },
+        );
+    } else {
+        settings.knowledge_base_indexes.remove(&id);
+    }
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+async fn generate_knowledge_base_index(
+    id: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let (material, model) = {
+        let settings = state
+            .settings
+            .lock()
+            .map_err(|_| "Settings lock failed.".to_string())?;
+        (
+            knowledge_base_index_material(&settings, &id)?,
+            settings.model.clone(),
+        )
+    };
+    let api_key = WindowsCredentialStore::load()?;
+    let content = deepseek::generate_index(&model, &api_key, &material).await?;
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    save_generated_knowledge_base_index(&mut settings, id, content)?;
+    SettingsRepository::save(&settings)?;
     Ok(SettingsRepository::payload(settings.clone()))
 }
 
@@ -474,8 +998,12 @@ fn save_settings(
     state: State<'_, AppState>,
 ) -> std::result::Result<SettingsPayload, String> {
     WindowsCredentialStore::save(&input.api_key)?;
+    let existing = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?
+        .clone();
     let reference_shortcut = input.reference_shortcut.trim().to_string();
-    register_reference_shortcut(&app, reference_shortcut.clone())?;
     let settings = Settings {
         model: if input.model.trim().is_empty() {
             Settings::default().model
@@ -486,19 +1014,33 @@ fn save_settings(
         knowledge_bases_root: input.knowledge_bases_root.trim().to_owned(),
         default_agent: input.default_agent,
         default_knowledge_base: input.default_knowledge_base,
-        allow_network: input.allow_network,
+        combinations: existing.combinations.clone(),
+        default_combination: existing.default_combination.clone(),
+        knowledge_base_indexes: existing.knowledge_base_indexes.clone(),
+        allow_network: feature_enabled(&existing, "network-search"),
         reference_shortcut,
         reference_capture_mode: if input.reference_capture_mode == "clipboard" {
             "clipboard".to_string()
         } else {
             "selection".to_string()
         },
+        feature_toggles: existing.feature_toggles,
+        shortcuts: existing.shortcuts,
     };
+    if feature_enabled(&settings, "reference-context") {
+        validate_shortcut(&settings.reference_shortcut)?;
+    }
+    reregister_shortcuts(&app, &settings)?;
     SettingsRepository::save(&settings)?;
     *state
         .settings
         .lock()
         .map_err(|_| "Settings lock failed.".to_string())? = settings.clone();
+    state.diagnostics.info(
+        "settings.saved",
+        None,
+        serde_json::json!({ "networkEnabled": settings.allow_network }),
+    );
     Ok(SettingsRepository::payload(settings))
 }
 
@@ -567,91 +1109,13 @@ fn main() {
                     }
                 })
                 .build(app)?;
-            let handle = app.handle().clone();
-            app.global_shortcut()
-                .on_shortcut("Ctrl+Alt+E", move |_, _, event| {
-                    if event.state() != ShortcutState::Pressed {
-                        return;
-                    }
-                    let app_handle = handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let captured = match tauri::async_runtime::spawn_blocking(
-                            clipboard::capture_selection_on_worker,
-                        )
-                        .await
-                        {
-                            Ok(Ok(captured)) => Ok(captured),
-                            Ok(Err(error)) => Err(error.message().to_string()),
-                            Err(error) => Err(format!("Selection worker failed: {error}")),
-                        };
-                        let window = match app_handle.get_webview_window("main") {
-                            Some(window) => window,
-                            None => return,
-                        };
-                        match captured {
-                            Ok(Some(captured)) => {
-                                let target = captured.target;
-                                let original = captured.text;
-                                let state = app_handle.state::<AppState>();
-                                let reference_text = state
-                                    .reference_text
-                                    .lock()
-                                    .expect("Reference lock failed")
-                                    .take();
-                                *state.pending.lock().expect("Pending session lock failed") =
-                                    Some(PendingSession {
-                                        target,
-                                        original: original.clone(),
-                                        reference_text: reference_text.clone(),
-                                    });
-                                let settings = match state.settings.lock() {
-                                    Ok(settings) => settings.clone(),
-                                    Err(_) => {
-                                        let _ =
-                                            window.emit("capture-error", "Settings lock failed.");
-                                        let _ = window.show();
-                                        let _ = window.set_focus();
-                                        return;
-                                    }
-                                };
-                                let payload = preview_payload(
-                                    original,
-                                    String::new(),
-                                    &settings,
-                                    reference_text,
-                                );
-                                let _ = show_preview(&window, payload);
-                            }
-                            Ok(None) => {}
-                            Err(error) => {
-                                let _ = window.emit("capture-error", error);
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                    });
-                })?;
-            let reference_shortcut = app
+            let loaded_settings = app
                 .state::<AppState>()
                 .settings
                 .lock()
                 .map_err(|_| "Settings lock failed")?
-                .reference_shortcut
                 .clone();
-            register_reference_shortcut(app.handle(), reference_shortcut)?;
-            let settings_handle = app.handle().clone();
-            app.global_shortcut()
-                .on_shortcut("Ctrl+Shift+Alt+S", move |_, _, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        let _ = show_settings(&settings_handle);
-                    }
-                })?;
-            app.global_shortcut()
-                .on_shortcut("Ctrl+Alt+Q", move |app, _, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        app.exit(0);
-                    }
-                })?;
+            reregister_shortcuts(app.handle(), &loaded_settings)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -662,11 +1126,24 @@ fn main() {
             analyze_session,
             generate_replacement,
             hide_main_window,
+            get_diagnostics,
+            clear_diagnostics,
+            report_client_diagnostic,
             get_settings,
+            get_feature_and_shortcut_settings,
+            save_feature_and_shortcut_settings,
+            suspend_global_shortcuts,
+            resume_global_shortcuts,
             import_agent,
-            import_knowledge_base,
+            import_knowledge_bases,
             delete_agent,
             delete_knowledge_base,
+            save_combination,
+            delete_combination,
+            set_default_combination,
+            get_knowledge_base_index_candidates,
+            set_knowledge_base_index,
+            generate_knowledge_base_index,
             save_settings,
             test_deepseek_connection
         ])

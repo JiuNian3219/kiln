@@ -15,6 +15,10 @@ pub struct SessionInput {
     pub candidate: bool,
     #[serde(default)]
     pub use_reference: bool,
+    #[serde(default)]
+    pub reference_context_type: String,
+    #[serde(default)]
+    pub reference_context_note: String,
 }
 
 #[derive(Clone, Debug, Serialize)]

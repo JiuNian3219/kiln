@@ -5,16 +5,32 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"*.{html,js,json}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css}\" \"*.{html,js,json}\"",
+    "check:frontend": "npm run format:check && npm run lint && npm run build",
+    "check:backend": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml",
+    "check": "npm run check:frontend && npm run check:backend"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
     "antd": "^5.26.7",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2.11.4",
     "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^10.7.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.6",
     "vite": "^6.3.5"
   }
 }

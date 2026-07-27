@@ -5,9 +5,16 @@ import { ActionBar } from '../../components/ActionBar';
 import './WorkCombinationPanel.css';
 
 const { Text } = Typography;
+const generalCombination = {
+  id: '',
+  name: '通用增强',
+  agentId: '',
+  knowledgeBaseIds: [],
+  isBuiltIn: true,
+};
 
 export function CombinationPanel({ payload, busy, onOpenEditor, onEdit, onDelete, onSetDefault }) {
-  const combinations = payload.settings.combinations || [];
+  const combinations = [generalCombination, ...(payload.settings.combinations || [])];
   return (
     <section className="combination-panel">
       <div className="catalog-heading">
@@ -37,38 +44,55 @@ export function CombinationPanel({ payload, busy, onOpenEditor, onEdit, onDelete
         }}
         renderItem={(item) => (
           <List.Item
-            actions={[
-              <Button
-                key="edit"
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => onEdit(item)}
-              >
-                编辑
-              </Button>,
-              <Button
-                key="default"
-                size="small"
-                type={payload.settings.defaultCombination === item.id ? 'primary' : 'text'}
-                onClick={() => onSetDefault(item.id)}
-              >
-                默认
-              </Button>,
-              <Popconfirm
-                key="delete"
-                title={`删除「${item.name}」？`}
-                okText="删除"
-                cancelText="取消"
-                onConfirm={() => onDelete(item.id)}
-              >
-                <Button danger type="text" size="small" icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
+            actions={
+              item.isBuiltIn
+                ? [
+                    <Button
+                      key="default"
+                      size="small"
+                      type={payload.settings.defaultCombination === item.id ? 'primary' : 'text'}
+                      onClick={() => onSetDefault(item.id)}
+                    >
+                      默认
+                    </Button>,
+                  ]
+                : [
+                    <Button
+                      key="edit"
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => onEdit(item)}
+                    >
+                      编辑
+                    </Button>,
+                    <Button
+                      key="default"
+                      size="small"
+                      type={payload.settings.defaultCombination === item.id ? 'primary' : 'text'}
+                      onClick={() => onSetDefault(item.id)}
+                    >
+                      默认
+                    </Button>,
+                    <Popconfirm
+                      key="delete"
+                      title={`删除「${item.name}」？`}
+                      okText="删除"
+                      cancelText="取消"
+                      onConfirm={() => onDelete(item.id)}
+                    >
+                      <Button danger type="text" size="small" icon={<DeleteOutlined />} />
+                    </Popconfirm>,
+                  ]
+            }
           >
             <List.Item.Meta
               title={item.name}
-              description={`Agent：${item.agentId} · 知识库：${item.knowledgeBaseIds.length} 个`}
+              description={
+                item.isBuiltIn
+                  ? '不使用 Agent 或知识库，使用内置任务增强。'
+                  : `Agent：${item.agentId} · 知识库：${item.knowledgeBaseIds.length} 个`
+              }
             />
           </List.Item>
         )}

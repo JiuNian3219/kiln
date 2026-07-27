@@ -19,7 +19,7 @@ const emptyContext = {
   referenceContextType: 'background',
   referenceContextNote: '',
 };
-const asPanelPayload = (payload) => ({ ...payload, settings: { ...payload.settings, apiKey: '' } });
+const asPanelPayload = (payload) => ({ ...payload, settings: { ...payload.settings } });
 function App() {
   const [view, setView] = useState('palette');
   const [phase, setPhase] = useState('context');
@@ -327,9 +327,6 @@ function App() {
           setView('palette');
         }}
         onClose={() => invoke('hide_main_window')}
-        onChange={(field, value) =>
-          setSettings((current) => ({ ...current, settings: { ...current.settings, [field]: value } }))
-        }
         onImportAgent={importAgent}
         onImportKnowledgeBases={importKnowledgeBases}
         onDelete={(command, id, label) => refreshSettings(() => invoke(command, { id }), `${label} 已删除。`)}
@@ -364,19 +361,22 @@ function App() {
             setSettingsNotice(`无法读取知识库文件：${error}`);
           }
         }}
-        onSave={() =>
+        onSaveModelProvider={(input) =>
+          refreshSettings(() => invoke('save_model_provider', { input }), 'AI 服务已保存。')
+        }
+        onDeleteModelProvider={(id) =>
+          refreshSettings(() => invoke('delete_model_provider', { id }), 'AI 服务已删除。')
+        }
+        onSetDefaultModelProvider={(id) =>
           refreshSettings(
-            () =>
-              invoke('save_settings', {
-                input: { ...settings.settings, apiKey: settings.settings.apiKey || '' },
-              }),
-            '配置已保存。',
+            () => invoke('set_default_model_provider', { id }),
+            'AI 服务选择已保存，将用于增强。',
           )
         }
-        onTest={async () => {
+        onTestModelProvider={async (id) => {
           setSettingsBusy(true);
           try {
-            setSettingsNotice(`API 测试成功：${await invoke('test_deepseek_connection')}`);
+            setSettingsNotice(`API 测试成功：${await invoke('test_model_provider', { id })}`);
           } catch (error) {
             setSettingsNotice(`API 测试失败：${error}`);
           } finally {

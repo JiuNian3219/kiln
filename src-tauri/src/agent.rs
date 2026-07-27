@@ -7,10 +7,10 @@ use tauri::{Emitter, WebviewWindow};
 
 use crate::agent_protocol;
 use crate::credential::WindowsCredentialStore;
-use crate::deepseek;
 use crate::diagnostics::Diagnostics;
+use crate::provider;
 use crate::session::{ClarificationPayload, ClarificationQuestion, SessionInput};
-use crate::settings::{Settings, read_knowledge_base_index};
+use crate::settings::{ModelProvider, Settings, active_model_provider, read_knowledge_base_index};
 use crate::workspace::{self, ToolScope};
 
 const MAX_AUTOMATIC_RETRIES: u8 = 3;
@@ -154,7 +154,7 @@ async fn execute_web_tool(
 async fn run_agent_tool_loop(
     client: &reqwest::Client,
     api_key: &str,
-    settings: &Settings,
+    provider: &ModelProvider,
     system_prompt: &str,
     original: &str,
     scopes: &[ToolScope],
@@ -169,36 +169,16 @@ async fn run_agent_tool_loop(
         serde_json::json!({"role":"user","content":original}),
     ];
     for _ in 0..6 {
-        let response = client
-            .post(deepseek::CHAT_COMPLETIONS_URL)
-            .bearer_auth(api_key)
-            .json(&serde_json::json!({
-                "model": settings.model,
-                "messages": messages,
-                "tools": tools,
-                "stream": false,
-                "thinking": { "type": "disabled" },
-                "max_tokens": 900
-            }))
-            .send()
-            .await
-            .map_err(|error| format!("Unable to reach DeepSeek: {error}"))?;
-        let status = response.status();
-        if !status.is_success() {
-            let detail = response.text().await.unwrap_or_default();
-            return Err(format!(
-                "DeepSeek returned HTTP {status}: {}",
-                detail.chars().take(320).collect::<String>()
-            ));
-        }
-        let payload: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|error| format!("DeepSeek returned an invalid tool response: {error}"))?;
-        let message = payload
-            .pointer("/choices/0/message")
-            .cloned()
-            .ok_or_else(|| "DeepSeek returned no assistant message.".to_string())?;
+        let message = provider::complete(
+            client,
+            provider,
+            api_key,
+            &messages,
+            Some(&tools),
+            900,
+            false,
+        )
+        .await?;
         let tool_calls = message
             .get("tool_calls")
             .and_then(serde_json::Value::as_array)
@@ -268,6 +248,7 @@ async fn run_agent_tool_loop(
             messages.push(serde_json::json!({
                 "role":"tool",
                 "tool_call_id": id,
+                "tool_name": name,
                 "content": content
             }));
         }
@@ -347,11 +328,20 @@ async fn prepared_messages(
     window: &WebviewWindow,
     diagnostics: &Diagnostics,
     session_id: &str,
-) -> std::result::Result<(reqwest::Client, String, Vec<serde_json::Value>), String> {
+) -> std::result::Result<
+    (
+        reqwest::Client,
+        ModelProvider,
+        String,
+        Vec<serde_json::Value>,
+    ),
+    String,
+> {
     validate_session_input(input)?;
-    let api_key = WindowsCredentialStore::load()?;
+    let provider = active_model_provider(&settings)?;
+    let api_key = WindowsCredentialStore::load_for(&provider.id)?;
 
-    let client = deepseek::client(Duration::from_secs(60))?;
+    let client = provider::client(Duration::from_secs(60))?;
     let scopes = tool_scopes(&settings, input)?;
     let allow_network = settings.allow_network && input.use_network;
     let messages = if scopes.is_empty() && !allow_network {
@@ -363,7 +353,7 @@ async fn prepared_messages(
         run_agent_tool_loop(
             &client,
             &api_key,
-            &settings,
+            &provider,
             &system_prompt,
             &user_message,
             &scopes,
@@ -374,46 +364,17 @@ async fn prepared_messages(
         )
         .await?
     };
-    Ok((client, api_key, messages))
+    Ok((client, provider, api_key, messages))
 }
 
 async fn model_text(
     client: &reqwest::Client,
     api_key: &str,
-    settings: &Settings,
+    provider: &ModelProvider,
     messages: Vec<serde_json::Value>,
     max_tokens: u32,
 ) -> std::result::Result<String, String> {
-    let response = client
-        .post(deepseek::CHAT_COMPLETIONS_URL)
-        .bearer_auth(api_key)
-        .json(&serde_json::json!({
-            "model": settings.model,
-            "messages": messages,
-            "stream": false,
-            "tool_choice": "none",
-            "thinking": { "type": "disabled" },
-            "response_format": { "type": "json_object" },
-            "max_tokens": max_tokens
-        }))
-        .send()
-        .await
-        .map_err(|error| format!("Unable to reach DeepSeek: {error}"))?;
-    let status = response.status();
-    if !status.is_success() {
-        let detail = response.text().await.unwrap_or_default();
-        let detail: String = detail.chars().take(320).collect();
-        return Err(format!("DeepSeek returned HTTP {status}: {detail}"));
-    }
-    let payload: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|error| format!("DeepSeek returned an invalid response: {error}"))?;
-    payload
-        .pointer("/choices/0/message/content")
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| "DeepSeek returned no response text.".to_string())
+    provider::text(client, provider, api_key, &messages, max_tokens, true).await
 }
 
 fn parse_questions(text: &str) -> std::result::Result<ClarificationPayload, String> {
@@ -428,7 +389,7 @@ fn parse_questions(text: &str) -> std::result::Result<ClarificationPayload, Stri
             (Some(start), Some(end)) if start < end => serde_json::from_str(&text[start..=end]),
             _ => serde_json::from_str(text),
         })
-        .map_err(|_| "DeepSeek 未按约定返回澄清结果；请直接重试。".to_string())?;
+        .map_err(|_| "AI 服务未按约定返回澄清结果；请直接重试。".to_string())?;
     let kind = value
         .get("kind")
         .and_then(serde_json::Value::as_str)
@@ -448,16 +409,14 @@ fn parse_questions(text: &str) -> std::result::Result<ClarificationPayload, Stri
         return Err(format!("Agent reported: {message}"));
     }
     if kind != "questions" {
-        return Err("DeepSeek returned an unknown clarification result.".to_string());
+        return Err("AI 服务返回了未知的澄清结果。".to_string());
     }
     let items = value
         .get("questions")
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| "DeepSeek returned questions in an invalid format.".to_string())?;
     if items.is_empty() || items.len() > 3 {
-        return Err(
-            "DeepSeek must return between one and three clarification questions.".to_string(),
-        );
+        return Err("AI 服务必须返回一到三个澄清问题。".to_string());
     }
     let mut questions = Vec::new();
     for (index, item) in items.iter().enumerate() {
@@ -491,17 +450,17 @@ fn parse_questions(text: &str) -> std::result::Result<ClarificationPayload, Stri
 }
 
 fn retry_reason(error: &str) -> Option<&'static str> {
-    if error.starts_with("DeepSeek returned HTTP 401")
-        || error.starts_with("DeepSeek returned HTTP 403")
-        || error.starts_with("DeepSeek returned HTTP 400")
-        || error.starts_with("DeepSeek returned HTTP 422")
+    if error.contains("HTTP 401")
+        || error.contains("HTTP 403")
+        || error.contains("HTTP 400")
+        || error.contains("HTTP 422")
         || error.starts_with("Agent reported:")
     {
         return None;
     }
     if error.contains("HTTP 429") {
         Some("rate_limited")
-    } else if error.contains("HTTP 5") || error.contains("Unable to reach") {
+    } else if error.contains("HTTP 5") || error.contains("无法连接") {
         Some("network")
     } else if error.contains("invalid response") || error.contains("no response text") {
         Some("response")
@@ -549,7 +508,7 @@ async fn wait_for_retry(
 async fn questions_with_retries(
     client: &reqwest::Client,
     api_key: &str,
-    settings: &Settings,
+    provider: &ModelProvider,
     messages: &[serde_json::Value],
     window: &WebviewWindow,
     diagnostics: &Diagnostics,
@@ -561,7 +520,7 @@ async fn questions_with_retries(
         } else {
             retry_messages(messages)
         };
-        let result = model_text(client, api_key, settings, attempt_messages, 700)
+        let result = model_text(client, api_key, provider, attempt_messages, 700)
             .await
             .and_then(|text| parse_questions(&text));
         match result {
@@ -595,7 +554,7 @@ async fn questions_with_retries(
 async fn final_output_with_retries(
     client: &reqwest::Client,
     api_key: &str,
-    settings: &Settings,
+    provider: &ModelProvider,
     messages: &[serde_json::Value],
     expected_language: agent_protocol::ExpectedLanguage,
     window: &WebviewWindow,
@@ -608,7 +567,7 @@ async fn final_output_with_retries(
         } else {
             retry_messages(messages)
         };
-        let result = model_text(client, api_key, settings, attempt_messages, 1200)
+        let result = model_text(client, api_key, provider, attempt_messages, 1200)
             .await
             .and_then(|text| agent_protocol::parse_final_output(&text, expected_language));
         match result {
@@ -648,7 +607,7 @@ pub async fn analyze(
 ) -> std::result::Result<ClarificationPayload, String> {
     let (agent, knowledge_bases) = context_documents(&settings, input)?;
     let system_prompt = planning_system_prompt(agent.as_deref(), &knowledge_bases);
-    let (client, api_key, messages) = prepared_messages(
+    let (client, provider, api_key, messages) = prepared_messages(
         settings.clone(),
         input,
         agent_protocol::with_reference_context(
@@ -666,7 +625,7 @@ pub async fn analyze(
     questions_with_retries(
         &client,
         &api_key,
-        &settings,
+        &provider,
         &messages,
         window,
         diagnostics,
@@ -687,7 +646,7 @@ pub async fn generate(
 ) -> std::result::Result<String, String> {
     let (agent, knowledge_bases) = context_documents(&settings, input)?;
     let system_prompt = generation_system_prompt(agent.as_deref(), &knowledge_bases);
-    let (client, api_key, messages) = prepared_messages(
+    let (client, provider, api_key, messages) = prepared_messages(
         settings.clone(),
         input,
         agent_protocol::with_reference_context(
@@ -705,7 +664,7 @@ pub async fn generate(
     final_output_with_retries(
         &client,
         &api_key,
-        &settings,
+        &provider,
         &messages,
         agent_protocol::expected_language(&original),
         window,
@@ -758,7 +717,7 @@ mod tests {
         assert!(prompt.contains("Perspective fidelity"));
         assert!(prompt.contains("must not turn the author into a third-party subject"));
         assert!(prompt.contains("Interpretation-first output"));
-        assert!(prompt.contains("Do not invent numbered implementation steps"));
+        assert!(prompt.contains("do not invent architecture or file plans"));
     }
 
     #[test]

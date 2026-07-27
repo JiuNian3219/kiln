@@ -32,14 +32,14 @@
 
 - `src-tauri/src/main.rs`：Tauri 命令、会话状态、窗口/托盘与全局快捷键装配；不承载模型、剪贴板或资料读取细节。
 - `clipboard.rs`：Win32/OLE 剪贴板快照、恢复、复制选区、原生粘贴。仅在快捷键触发的工作线程使用。
-- `credential.rs`：唯一的 Windows Credential Manager API Key 入口。
+- `credential.rs`：唯一的 Windows Credential Manager API Key 入口，凭据按 AI 服务档案隔离。
 - `settings.rs`：非敏感设置、目录目录项发现、受限导入/删除。
 - `workspace.rs`：唯一的本地资料工具面；规范化路径、只读白名单、32 KB 单文件上限和数量/深度上限。
-- `deepseek.rs`：DeepSeek HTTP 客户端与不含敏感信息的连通性测试。
+- `provider.rs`：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages、Gemini GenerateContent 的统一 HTTP 适配与不含敏感信息的连通性测试。
 - `session.rs`：前后端会话数据类型。
 - `agent_protocol.rs`：宿主控制的提示词包裹、SSE 增量解析、DSML/文本工具调用防护。
 - `agent.rs`：本次请求的上下文、工具循环、网络约束、澄清解析与流式生成。
-- `src/App.jsx`：会话状态与事件编排；`src/components/PaletteParts.jsx`：预览/控制面板组件；`src/lib/tauri.js`：唯一前端 Tauri 调用边界。
+- `src/App.jsx`：会话状态与事件编排；`src/features/palette/` 与 `src/features/control/`：浮窗和控制面板组件；`src/lib/tauri.js`：唯一前端 Tauri 调用边界。
 
 ## 修改与验证
 

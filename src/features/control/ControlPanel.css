@@ -59,6 +59,10 @@
   overflow: hidden;
   padding-right: 0;
 }
+.control-panel .ant-tabs-tabpane:has(.provider-editor) {
+  overflow: hidden;
+  padding-right: 0;
+}
 .compact-form {
   display: flex;
   min-height: 100%;

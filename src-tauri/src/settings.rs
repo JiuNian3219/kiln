@@ -10,6 +10,9 @@ use crate::workspace;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    /// Legacy DeepSeek model setting. Kept so older settings files can be
+    /// migrated into the first provider profile without losing the selection.
+    #[serde(default = "default_deepseek_model")]
     pub model: String,
     pub agents_root: String,
     pub knowledge_bases_root: String,
@@ -31,6 +34,33 @@ pub struct Settings {
     pub feature_toggles: HashMap<String, bool>,
     #[serde(default = "default_shortcuts")]
     pub shortcuts: HashMap<String, String>,
+    #[serde(default)]
+    pub model_providers: Vec<ModelProvider>,
+    #[serde(default)]
+    pub default_model_provider: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelProvider {
+    pub id: String,
+    pub name: String,
+    pub protocol: String,
+    pub base_url: String,
+    pub model: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelProviderInput {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    pub protocol: String,
+    pub base_url: String,
+    pub model: String,
+    #[serde(default)]
+    pub api_key: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -71,21 +101,6 @@ pub struct FeatureAndShortcutSaveResult {
     pub settings: FeatureAndShortcutSettings,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SettingsInput {
-    pub model: String,
-    pub agents_root: String,
-    pub knowledge_bases_root: String,
-    pub default_agent: String,
-    pub default_knowledge_base: String,
-    pub api_key: String,
-    #[serde(default = "default_reference_shortcut")]
-    pub reference_shortcut: String,
-    #[serde(default = "default_reference_capture_mode")]
-    pub reference_capture_mode: String,
-}
-
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CombinationInput {
@@ -97,6 +112,41 @@ pub struct CombinationInput {
 
 fn default_reference_shortcut() -> String {
     "Ctrl+Shift+T".to_string()
+}
+
+fn default_deepseek_model() -> String {
+    "deepseek-v4-flash".to_string()
+}
+
+pub fn deepseek_provider(model: String) -> ModelProvider {
+    ModelProvider {
+        id: "deepseek".to_string(),
+        name: "DeepSeek".to_string(),
+        protocol: "openai-chat-completions".to_string(),
+        base_url: "https://api.deepseek.com".to_string(),
+        model,
+    }
+}
+
+pub fn supported_provider_protocol(protocol: &str) -> bool {
+    matches!(
+        protocol,
+        "openai-chat-completions"
+            | "openai-responses"
+            | "anthropic-messages"
+            | "gemini-generate-content"
+    )
+}
+
+pub fn active_model_provider(settings: &Settings) -> Result<ModelProvider, String> {
+    let id = settings.default_model_provider.trim();
+    settings
+        .model_providers
+        .iter()
+        .find(|provider| provider.id == id)
+        .or_else(|| settings.model_providers.first())
+        .cloned()
+        .ok_or_else(|| "尚未配置 AI 服务。请在控制面板中添加服务。".to_string())
 }
 
 fn default_reference_capture_mode() -> String {
@@ -183,7 +233,7 @@ pub struct SettingsPayload {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            model: "deepseek-v4-flash".into(),
+            model: default_deepseek_model(),
             agents_root: String::new(),
             knowledge_bases_root: String::new(),
             default_agent: String::new(),
@@ -196,6 +246,8 @@ impl Default for Settings {
             reference_capture_mode: default_reference_capture_mode(),
             feature_toggles: default_feature_toggles(),
             shortcuts: default_shortcuts(),
+            model_providers: vec![deepseek_provider(default_deepseek_model())],
+            default_model_provider: "deepseek".to_string(),
         }
     }
 }
@@ -231,6 +283,22 @@ impl SettingsRepository {
         for (key, value) in default_shortcuts() {
             settings.shortcuts.entry(key).or_insert(value);
         }
+        if settings.model_providers.is_empty() {
+            settings
+                .model_providers
+                .push(deepseek_provider(settings.model.clone()));
+        }
+        if !settings
+            .model_providers
+            .iter()
+            .any(|provider| provider.id == settings.default_model_provider)
+        {
+            settings.default_model_provider = settings
+                .model_providers
+                .first()
+                .map(|provider| provider.id.clone())
+                .unwrap_or_default();
+        }
         settings.allow_network = feature_enabled(&settings, "network-search");
         if settings.agents_root.trim().is_empty() {
             settings.agents_root = managed_library_root("agents")?
@@ -261,7 +329,10 @@ impl SettingsRepository {
         SettingsPayload {
             agents: discover_catalog(&settings.agents_root, "AGENT.md"),
             knowledge_bases: discover_knowledge_bases(&settings),
-            api_key_configured: WindowsCredentialStore::configured(),
+            api_key_configured: active_model_provider(&settings)
+                .ok()
+                .map(|provider| WindowsCredentialStore::configured_for(&provider.id))
+                .unwrap_or(false),
             settings,
         }
     }

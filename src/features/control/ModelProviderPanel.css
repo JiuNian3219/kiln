@@ -1,0 +1,102 @@
+.model-provider-panel,
+.provider-editor {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+.provider-editor {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.model-provider-panel .catalog-heading > div,
+.provider-editor-heading > div {
+  display: grid;
+  gap: 2px;
+}
+.model-provider-panel .catalog-heading span,
+.provider-editor-heading span {
+  color: #849087;
+  font-size: var(--font-size-caption);
+}
+.model-provider-panel .catalog-heading {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e9e3;
+}
+.model-provider-panel .catalog-heading .ant-btn {
+  display: inline-flex;
+  height: 25px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+}
+.model-provider-panel .catalog-heading .ant-btn:hover {
+  background: #6c8871 !important;
+}
+.provider-list .ant-list-item {
+  align-items: center;
+}
+.provider-list .ant-list-item-meta-title {
+  color: #4c5b51;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.provider-list .ant-list-item-meta-description {
+  color: #879188;
+  font-size: var(--font-size-caption);
+}
+.provider-list .ant-tag {
+  margin-left: 5px;
+  border: 0;
+  font-size: var(--font-size-micro);
+}
+.provider-list .ant-checkbox-wrapper {
+  color: #67756c;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+.provider-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 11px;
+}
+.provider-editor-heading .ant-btn {
+  padding-inline: 0;
+}
+.deepseek-preset {
+  align-self: flex-start;
+  margin: 0 0 8px;
+  border-color: #c9d7c9;
+  color: #577760;
+  background: #f0f6ed;
+}
+.provider-editor-form {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 1px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.provider-editor-form::-webkit-scrollbar {
+  display: none;
+}
+.provider-editor-form .ant-form-item {
+  margin-bottom: 8px;
+}
+.provider-editor-form .ant-form-item-label {
+  padding-bottom: 3px;
+}
+.provider-editor-form .ant-form-item-label > label {
+  color: #647269;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+.provider-editor .action-bar {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: 10px 0 8px;
+  background: #f5f6f2;
+}

@@ -16,8 +16,8 @@ mod agent;
 mod agent_protocol;
 mod clipboard;
 mod credential;
-mod deepseek;
 mod diagnostics;
+mod provider;
 mod session;
 mod settings;
 mod workspace;
@@ -27,10 +27,10 @@ use diagnostics::{Diagnostics, DiagnosticsPayload};
 use session::{ClarificationPayload, SessionInput};
 use settings::{
     CatalogEntry, CatalogRepository, Combination, CombinationInput, FeatureAndShortcutSaveResult,
-    FeatureAndShortcutSettings, Settings, SettingsInput, SettingsPayload, SettingsRepository,
-    discover_catalog, discover_knowledge_bases, feature_enabled, knowledge_base_index_candidates,
-    knowledge_base_index_material, save_generated_knowledge_base_index, shortcut_for,
-    validate_shortcut,
+    FeatureAndShortcutSettings, ModelProvider, ModelProviderInput, Settings, SettingsPayload,
+    SettingsRepository, active_model_provider, discover_catalog, discover_knowledge_bases,
+    feature_enabled, knowledge_base_index_candidates, knowledge_base_index_material,
+    save_generated_knowledge_base_index, shortcut_for, validate_shortcut,
 };
 
 struct AppState {
@@ -990,18 +990,30 @@ async fn generate_knowledge_base_index(
     id: String,
     state: State<'_, AppState>,
 ) -> std::result::Result<SettingsPayload, String> {
-    let (material, model) = {
+    let (material, provider) = {
         let settings = state
             .settings
             .lock()
             .map_err(|_| "Settings lock failed.".to_string())?;
         (
             knowledge_base_index_material(&settings, &id)?,
-            settings.model.clone(),
+            active_model_provider(&settings)?,
         )
     };
-    let api_key = WindowsCredentialStore::load()?;
-    let content = deepseek::generate_index(&model, &api_key, &material).await?;
+    let api_key = WindowsCredentialStore::load_for(&provider.id)?;
+    let client = provider::client(std::time::Duration::from_secs(60))?;
+    let content = provider::text(
+        &client,
+        &provider,
+        &api_key,
+        &[
+            serde_json::json!({"role":"system","content":"根据给出的资料文件清单和有限摘录，生成简洁的中文知识库索引。说明主题、适用范围，并列出每个文件的用途。不要编造文件中没有的信息。仅输出 Markdown。"}),
+            serde_json::json!({"role":"user","content":material}),
+        ],
+        1200,
+        false,
+    )
+    .await?;
     let mut settings = state
         .settings
         .lock()
@@ -1011,72 +1023,159 @@ async fn generate_knowledge_base_index(
     Ok(SettingsRepository::payload(settings.clone()))
 }
 
-#[tauri::command]
-fn save_settings(
-    app: AppHandle,
-    input: SettingsInput,
-    state: State<'_, AppState>,
-) -> std::result::Result<SettingsPayload, String> {
-    WindowsCredentialStore::save(&input.api_key)?;
-    let existing = state
-        .settings
-        .lock()
-        .map_err(|_| "Settings lock failed.".to_string())?
-        .clone();
-    let reference_shortcut = input.reference_shortcut.trim().to_string();
-    let settings = Settings {
-        model: if input.model.trim().is_empty() {
-            Settings::default().model
+async fn test_provider_connection(provider: &ModelProvider) -> std::result::Result<String, String> {
+    let api_key = WindowsCredentialStore::load_for(&provider.id)?;
+    let client = provider::client(std::time::Duration::from_secs(20))?;
+    let content = provider::text(
+        &client,
+        provider,
+        &api_key,
+        &[
+            serde_json::json!({"role":"system","content":"Reply with exactly OK."}),
+            serde_json::json!({"role":"user","content":"OK"}),
+        ],
+        16,
+        false,
+    )
+    .await?;
+    Ok(content)
+}
+
+fn provider_id_from_name(name: &str, existing: &[ModelProvider]) -> String {
+    let cleaned = name
+        .chars()
+        .filter_map(|character| {
+            character
+                .is_ascii_alphanumeric()
+                .then(|| character.to_ascii_lowercase())
+                .or_else(|| matches!(character, ' ' | '-' | '_').then_some('-'))
+        })
+        .collect::<String>();
+    let base = cleaned.trim_matches('-');
+    let base = if base.is_empty() { "provider" } else { base };
+    let mut index = 1_u32;
+    loop {
+        let candidate = if index == 1 {
+            base.to_string()
         } else {
-            input.model.trim().to_owned()
-        },
-        agents_root: input.agents_root.trim().to_owned(),
-        knowledge_bases_root: input.knowledge_bases_root.trim().to_owned(),
-        default_agent: input.default_agent,
-        default_knowledge_base: input.default_knowledge_base,
-        combinations: existing.combinations.clone(),
-        default_combination: existing.default_combination.clone(),
-        knowledge_base_indexes: existing.knowledge_base_indexes.clone(),
-        allow_network: feature_enabled(&existing, "network-search"),
-        reference_shortcut,
-        reference_capture_mode: if input.reference_capture_mode == "clipboard" {
-            "clipboard".to_string()
-        } else {
-            "selection".to_string()
-        },
-        feature_toggles: existing.feature_toggles,
-        shortcuts: existing.shortcuts,
-    };
-    if feature_enabled(&settings, "reference-context") {
-        validate_shortcut(&settings.reference_shortcut)?;
+            format!("{base}-{index}")
+        };
+        if !existing.iter().any(|provider| provider.id == candidate) {
+            return candidate;
+        }
+        index += 1;
     }
-    reregister_shortcuts(&app, &settings)?;
-    SettingsRepository::save(&settings)?;
-    *state
-        .settings
-        .lock()
-        .map_err(|_| "Settings lock failed.".to_string())? = settings.clone();
-    state.diagnostics.info(
-        "settings.saved",
-        None,
-        serde_json::json!({ "networkEnabled": settings.allow_network }),
-    );
-    Ok(SettingsRepository::payload(settings))
 }
 
 #[tauri::command]
-async fn test_deepseek_connection(
+fn save_model_provider(
+    input: ModelProviderInput,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    let id = if input.id.trim().is_empty() {
+        provider_id_from_name(input.name.trim(), &settings.model_providers)
+    } else {
+        input.id.trim().to_string()
+    };
+    let provider = ModelProvider {
+        id: id.clone(),
+        name: input.name.trim().to_string(),
+        protocol: input.protocol.trim().to_string(),
+        base_url: input.base_url.trim().trim_end_matches('/').to_string(),
+        model: input.model.trim().to_string(),
+    };
+    provider::validate_provider(&provider)?;
+    if let Some(existing) = settings
+        .model_providers
+        .iter_mut()
+        .find(|existing| existing.id == id)
+    {
+        *existing = provider;
+    } else {
+        settings.model_providers.push(provider);
+    }
+    if settings.default_model_provider.is_empty() {
+        settings.default_model_provider = id.clone();
+    }
+    WindowsCredentialStore::save_for(&id, &input.api_key)?;
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+fn delete_model_provider(
+    id: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    if !settings
+        .model_providers
+        .iter()
+        .any(|provider| provider.id == id)
+    {
+        return Err("AI 服务不存在。".to_string());
+    }
+    if settings.model_providers.len() == 1 {
+        return Err("请至少保留一个 AI 服务。".to_string());
+    }
+    settings
+        .model_providers
+        .retain(|provider| provider.id != id);
+    if settings.default_model_provider == id {
+        settings.default_model_provider = settings
+            .model_providers
+            .first()
+            .map(|provider| provider.id.clone())
+            .unwrap_or_default();
+    }
+    WindowsCredentialStore::delete_for(&id)?;
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+fn set_default_model_provider(
+    id: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<SettingsPayload, String> {
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "Settings lock failed.".to_string())?;
+    if !settings
+        .model_providers
+        .iter()
+        .any(|provider| provider.id == id)
+    {
+        return Err("AI 服务不存在。".to_string());
+    }
+    settings.default_model_provider = id;
+    SettingsRepository::save(&settings)?;
+    Ok(SettingsRepository::payload(settings.clone()))
+}
+
+#[tauri::command]
+async fn test_model_provider(
+    id: String,
     state: State<'_, AppState>,
 ) -> std::result::Result<String, String> {
-    let settings = state
+    let provider = state
         .settings
         .lock()
         .map_err(|_| "Settings lock failed.".to_string())?
-        .clone();
-    let api_key = WindowsCredentialStore::load()
-        .map_err(|_| "No DeepSeek API Key is saved. Save a Key first.".to_string())?;
-
-    deepseek::test_connection(&settings.model, &api_key).await
+        .model_providers
+        .iter()
+        .find(|provider| provider.id == id)
+        .cloned()
+        .ok_or_else(|| "AI 服务不存在。".to_string())?;
+    test_provider_connection(&provider).await
 }
 
 fn show_settings(app: &AppHandle) -> std::result::Result<(), String> {
@@ -1164,8 +1263,10 @@ fn main() {
             get_knowledge_base_index_candidates,
             set_knowledge_base_index,
             generate_knowledge_base_index,
-            save_settings,
-            test_deepseek_connection
+            save_model_provider,
+            delete_model_provider,
+            set_default_model_provider,
+            test_model_provider
         ])
         .run(tauri::generate_context!())
         .expect("Tauri application error");

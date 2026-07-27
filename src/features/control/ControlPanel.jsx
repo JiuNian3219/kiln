@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Button, Form, Input, Spin, Tabs } from 'antd';
+import { Button, Spin, Tabs } from 'antd';
 import { ArrowLeftOutlined, CloseOutlined } from '@ant-design/icons';
-import { ActionBar } from '../../components/ActionBar';
 import { FeatureAndShortcutPanel } from './FeatureAndShortcutPanel';
+import { ModelProviderPanel } from './ModelProviderPanel';
 import { CombinationEditorPage, CombinationPanel } from './WorkCombinationPanel';
 import { CatalogPanel } from './CatalogPanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
@@ -15,7 +15,6 @@ export function ControlPanel({
   canReturn,
   onBack,
   onClose,
-  onChange,
   onImportAgent,
   onImportKnowledgeBases,
   onDelete,
@@ -24,8 +23,10 @@ export function ControlPanel({
   onSetDefaultCombination,
   onGenerateKnowledgeBaseIndex,
   onSpecifyKnowledgeBaseIndex,
-  onSave,
-  onTest,
+  onSaveModelProvider,
+  onDeleteModelProvider,
+  onSetDefaultModelProvider,
+  onTestModelProvider,
   diagnostics,
   onRefreshDiagnostics,
   onCopyDiagnostics,
@@ -118,33 +119,16 @@ export function ControlPanel({
           },
           {
             key: 'model',
-            label: '模型',
+            label: 'AI 服务',
             children: (
-              <Form layout="vertical" className="compact-form">
-                <Form.Item label="DeepSeek 模型">
-                  <Input
-                    size="small"
-                    value={data.model}
-                    onChange={(event) => onChange('model', event.target.value)}
-                  />
-                </Form.Item>
-                <Form.Item label="DeepSeek API Key">
-                  <Input.Password
-                    size="small"
-                    value={data.apiKey || ''}
-                    placeholder={payload.apiKeyConfigured ? '已配置；留空保留当前 Key' : '尚未配置'}
-                    onChange={(event) => onChange('apiKey', event.target.value)}
-                  />
-                </Form.Item>
-                <ActionBar>
-                  <Button onClick={onTest} loading={busy}>
-                    测试 API
-                  </Button>
-                  <Button type="primary" onClick={onSave} loading={busy}>
-                    保存
-                  </Button>
-                </ActionBar>
-              </Form>
+              <ModelProviderPanel
+                payload={payload}
+                busy={busy}
+                onSave={onSaveModelProvider}
+                onDelete={onDeleteModelProvider}
+                onSetDefault={onSetDefaultModelProvider}
+                onTest={onTestModelProvider}
+              />
             ),
           },
           {

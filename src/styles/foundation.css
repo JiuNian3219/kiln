@@ -64,12 +64,20 @@ textarea {
   background: #f3f6f1 !important;
 }
 .ant-btn-primary {
+  color: #fffefa;
   border-color: #78967d;
   background: #78967d;
 }
 .ant-btn-primary:hover {
+  color: #fffefa !important;
   border-color: #6c8871 !important;
   background: #6c8871 !important;
+}
+.ant-btn-primary:disabled,
+.ant-btn-primary:disabled:hover {
+  color: #a2aaa3 !important;
+  border-color: #e0e5df !important;
+  background: #edf0eb !important;
 }
 .ant-checkbox-inner {
   border-color: #bfc9bd !important;

@@ -1,0 +1,84 @@
+.control-panel {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  color: #334039;
+  background: #f5f6f2;
+  padding-bottom: 0;
+}
+.control-notice {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #eef0eb;
+  color: #65746a;
+  background: #fafbf8;
+  font-size: var(--font-size-body);
+}
+.control-panel .ant-tabs {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 0 12px;
+  overflow: hidden;
+}
+.control-panel .ant-tabs-nav {
+  margin-bottom: 10px;
+}
+.control-panel .ant-tabs-tab {
+  padding: 9px 3px 7px;
+  color: #859187;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+.control-panel .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #6e8e76 !important;
+}
+.control-panel .ant-tabs-ink-bar {
+  background: #78967d;
+}
+.control-panel .ant-tabs-content-holder {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.control-panel .ant-tabs-content,
+.control-panel .ant-tabs-tabpane {
+  height: 100%;
+}
+.control-panel .ant-tabs-tabpane {
+  overflow: auto;
+  padding-right: 1px;
+}
+.control-panel .ant-tabs-tabpane:has(.feature-shortcut-panel) {
+  overflow: hidden;
+  padding-right: 0;
+}
+.compact-form {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+.compact-form .ant-form-item {
+  margin-bottom: 8px;
+}
+.compact-form .ant-form-item-label {
+  padding-bottom: 3px;
+}
+.compact-form .ant-form-item-label > label {
+  color: #647269;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+.compact-form .action-bar {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 10px 0 8px;
+  background: #f5f6f2;
+}

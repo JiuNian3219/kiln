@@ -1,0 +1,9 @@
+.action-bar {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #e8ebe5;
+}

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Input, Modal, Radio, Select, Space, Spin } from 'antd';
-import { CheckOutlined, CloseOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { chooseDirectories, chooseMarkdownFile, invoke, listen } from './lib/tauri';
-import { ActionBar, ControlPanel, PreviewBlock } from './components/PaletteParts';
+import { ControlPanel } from './features/control/ControlPanel';
+import { PaletteWindow } from './features/palette/PaletteWindow';
 
-const { TextArea } = Input;
 const emptyContext = {
   agents: [],
   knowledgeBases: [],
@@ -21,20 +19,7 @@ const emptyContext = {
   referenceContextType: 'background',
   referenceContextNote: '',
 };
-const GENERAL_ENHANCEMENT_VALUE = '__general_enhancement__';
-const referenceContextOptions = [
-  { value: 'background', label: '背景资料' },
-  { value: 'previous-ai-conversation', label: '先前的 AI 对话' },
-  { value: 'external-material', label: '外部资料 / 文档' },
-  { value: 'custom', label: '自定义说明' },
-];
-const referenceContextNotes = {
-  'previous-ai-conversation': '这是先前的 AI 对话。当前选区是我对这段对话的最新回应。',
-  'external-material': '这是外部资料或文档，只用于补充事实、术语和约束。',
-};
-const options = (items = []) => items.map((item) => ({ value: item.id, label: item.name }));
 const asPanelPayload = (payload) => ({ ...payload, settings: { ...payload.settings, apiKey: '' } });
-const preview = (text, limit = 240) => (text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text);
 function App() {
   const [view, setView] = useState('palette');
   const [phase, setPhase] = useState('context');
@@ -408,236 +393,48 @@ function App() {
     );
 
   return (
-    <main className="palette" aria-live="polite">
-      <header className="palette-titlebar">
-        <div className="palette-drag-region" data-tauri-drag-region>
-          <span className="app-mark">CODEX INPUT ENHANCER</span>
-        </div>
-        <div data-no-window-drag>
-          <Button
-            type="text"
-            size="small"
-            icon={<SettingOutlined />}
-            onClick={openControl}
-            aria-label="控制面板"
-          />
-          <Button type="text" size="small" icon={<CloseOutlined />} onClick={cancel} aria-label="取消" />
-        </div>
-      </header>
-      <div className="palette-status">
-        {busy && <Spin size="small" />}
-        {status}
-      </div>
-      {phase === 'context' && (
-        <section className="palette-body context-body">
-          <div className="context-scroll">
-            {context.referenceText && (
-              <div className="reference-context">
-                <div>
-                  <label>参考上下文</label>
-                  <span>{preview(context.referenceText, 80)}</span>
-                </div>
-                <Checkbox
-                  checked={context.referenceActive}
-                  disabled={busy}
-                  onChange={(event) => updateContext({ referenceActive: event.target.checked })}
-                >
-                  作为参考附带
-                </Checkbox>
-                <Button
-                  type="text"
-                  size="small"
-                  aria-label="清除参考上下文"
-                  onClick={async () => {
-                    await invoke('clear_reference');
-                    updateContext({
-                      referenceText: null,
-                      referenceActive: false,
-                      referenceContextType: 'background',
-                      referenceContextNote: '',
-                    });
-                  }}
-                >
-                  ×
-                </Button>
-                {context.referenceActive && (
-                  <div className="reference-context-guidance">
-                    <Select
-                      size="small"
-                      value={context.referenceContextType}
-                      options={referenceContextOptions}
-                      disabled={busy}
-                      aria-label="参考上下文用途"
-                      onChange={(value) =>
-                        updateContext({
-                          referenceContextType: value,
-                          referenceContextNote:
-                            referenceContextNotes[value] ||
-                            (value === 'background' ? '' : context.referenceContextNote),
-                        })
-                      }
-                    />
-                    <Input
-                      size="small"
-                      value={context.referenceContextNote}
-                      disabled={busy}
-                      maxLength={500}
-                      aria-label="参考上下文说明"
-                      placeholder="可补充说明它与当前草稿的关系"
-                      onChange={(event) => updateContext({ referenceContextNote: event.target.value })}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-            <label className="field-label">当前草稿</label>
-            <div className="draft-line">{preview(original, 120) || '等待读取选区…'}</div>
-            <div className="field-row">
-              <label>工作组合</label>
-              <Select
-                size="small"
-                value={context.selectedCombinationId || GENERAL_ENHANCEMENT_VALUE}
-                options={[
-                  { value: GENERAL_ENHANCEMENT_VALUE, label: '通用增强' },
-                  ...options(context.combinations),
-                ]}
-                disabled={busy}
-                onChange={(value) => {
-                  if (value === GENERAL_ENHANCEMENT_VALUE) {
-                    updateContext({
-                      selectedCombinationId: '',
-                      selectedAgentId: '',
-                      selectedKnowledgeBaseIds: [],
-                    });
-                    return;
-                  }
-                  const combination = context.combinations.find((item) => item.id === value);
-                  updateContext({
-                    selectedCombinationId: value,
-                    selectedAgentId: combination?.agentId || '',
-                    selectedKnowledgeBaseIds: combination?.knowledgeBaseIds || [],
-                  });
-                }}
-              />
-            </div>
-          </div>
-          <ActionBar>
-            <Button onClick={cancel}>取消</Button>
-            <Button type="primary" loading={busy} onClick={beginAnalysis}>
-              继续
-            </Button>
-          </ActionBar>
-        </section>
-      )}
-      {phase === 'questions' && currentQuestion && (
-        <section className="palette-body question-body">
-          <div className="question-scroll">
-            <div className="step-hint">
-              需要补充信息 · {questionIndex + 1}/{questions.length}
-            </div>
-            <h2>{currentQuestion.prompt}</h2>
-            {currentQuestion.options?.length ? (
-              <Radio.Group
-                value={answers[currentQuestion.id]?.choice}
-                onChange={(event) =>
-                  setAnswers((current) => ({
-                    ...current,
-                    [currentQuestion.id]: { ...current[currentQuestion.id], choice: event.target.value },
-                  }))
-                }
-              >
-                <Space direction="vertical">
-                  {currentQuestion.options.map((option) => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Space>
-              </Radio.Group>
-            ) : null}
-            <Input
-              size="small"
-              value={answers[currentQuestion.id]?.custom || ''}
-              onChange={(event) =>
-                setAnswers((current) => ({
-                  ...current,
-                  [currentQuestion.id]: { ...current[currentQuestion.id], custom: event.target.value },
-                }))
-              }
-              placeholder="或直接输入你的答案（优先采用）"
-            />
-          </div>
-          <ActionBar>
-            <Button
-              onClick={() => (questionIndex ? setQuestionIndex((index) => index - 1) : setPhase('context'))}
-              disabled={busy}
-            >
-              返回
-            </Button>
-            <Button type="primary" loading={busy} onClick={nextQuestion}>
-              {questionIndex + 1 === questions.length ? '生成' : '下一项'}
-            </Button>
-          </ActionBar>
-        </section>
-      )}
-      {phase === 'preview' && (
-        <section className="palette-body preview-body">
-          <div className="compare-grid">
-            <PreviewBlock label="原文" text={original} />
-            <PreviewBlock label="建议" text={replacement} accent />
-          </div>
-          <div className="key-hint">Enter 确认替换 · Tab 查看完整对比 · Esc 取消</div>
-          <ActionBar>
-            <Button onClick={cancel}>取消</Button>
-            <Button onClick={() => setDetailsOpen(true)}>查看完整对比</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => generateReplacement(true)} loading={busy}>
-              重新生成
-            </Button>
-            <Button type="primary" icon={<CheckOutlined />} onClick={acceptReplacement} loading={busy}>
-              替换
-            </Button>
-          </ActionBar>
-        </section>
-      )}
-      <Modal
-        open={detailsOpen}
-        title="完整对比"
-        footer={
-          <Space>
-            <Button onClick={() => setDetailsOpen(false)}>关闭</Button>
-            <Button
-              type="primary"
-              onClick={() => {
-                if (candidate) setReplacement(candidate);
-                setDetailsOpen(false);
-              }}
-            >
-              采用候选文本
-            </Button>
-          </Space>
-        }
-        onCancel={() => setDetailsOpen(false)}
-        centered
-        className="diff-modal"
-      >
-        <div className="full-diff">
-          <div>
-            <label>原文</label>
-            <pre>{original}</pre>
-          </div>
-          <div>
-            <label>建议</label>
-            <TextArea
-              value={candidate || replacement}
-              onChange={(event) =>
-                candidate ? setCandidate(event.target.value) : setReplacement(event.target.value)
-              }
-              autoSize={{ minRows: 8, maxRows: 12 }}
-            />
-          </div>
-        </div>
-      </Modal>
-    </main>
+    <PaletteWindow
+      phase={phase}
+      status={status}
+      busy={busy}
+      original={original}
+      replacement={replacement}
+      context={context}
+      currentQuestion={currentQuestion}
+      questionIndex={questionIndex}
+      questions={questions}
+      answers={answers}
+      detailsOpen={detailsOpen}
+      candidate={candidate}
+      onOpenControl={openControl}
+      onCancel={cancel}
+      onContextChange={updateContext}
+      onClearReference={async () => {
+        await invoke('clear_reference');
+        updateContext({
+          referenceText: null,
+          referenceActive: false,
+          referenceContextType: 'background',
+          referenceContextNote: '',
+        });
+      }}
+      onBeginAnalysis={beginAnalysis}
+      onAnswer={(id, answer) =>
+        setAnswers((current) => ({ ...current, [id]: { ...current[id], ...answer } }))
+      }
+      onQuestionBack={() => (questionIndex ? setQuestionIndex((index) => index - 1) : setPhase('context'))}
+      onQuestionNext={nextQuestion}
+      onDetailsOpen={() => setDetailsOpen(true)}
+      onDetailsClose={() => setDetailsOpen(false)}
+      onCandidateChange={setCandidate}
+      onReplacementChange={setReplacement}
+      onAdoptCandidate={() => {
+        if (candidate) setReplacement(candidate);
+        setDetailsOpen(false);
+      }}
+      onRegenerate={() => generateReplacement(true)}
+      onAccept={acceptReplacement}
+    />
   );
 }
 

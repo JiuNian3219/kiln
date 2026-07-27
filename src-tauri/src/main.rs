@@ -2,7 +2,8 @@
 
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -38,6 +39,7 @@ struct AppState {
     reference_text: Mutex<Option<String>>,
     registered_shortcuts: Mutex<Vec<String>>,
     settings: Mutex<Settings>,
+    toast_generation: Arc<AtomicU64>,
 }
 
 #[derive(Clone)]
@@ -76,6 +78,7 @@ impl Default for AppState {
             reference_text: Mutex::new(None),
             registered_shortcuts: Mutex::new(Vec::new()),
             settings: Mutex::new(settings),
+            toast_generation: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -187,7 +190,8 @@ async fn capture_reference_text(mode: &str) -> std::result::Result<(Option<Strin
     Ok((text, false))
 }
 
-fn show_reference_toast(app: &AppHandle) -> std::result::Result<(), String> {
+fn show_reference_toast(app: &AppHandle, state: &AppState) -> std::result::Result<(), String> {
+    let generation = state.toast_generation.fetch_add(1, Ordering::SeqCst) + 1;
     if let Some(existing) = app.get_webview_window("reference-toast") {
         let _ = existing.close();
     }
@@ -201,19 +205,35 @@ fn show_reference_toast(app: &AppHandle) -> std::result::Result<(), String> {
             .skip_taskbar(true)
             .focused(false)
             .focusable(false)
+            .visible(false)
             .build()
             .map_err(|error| error.to_string())?;
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let position = monitor.position();
         let size = monitor.size();
+        let toast_size = toast
+            .outer_size()
+            .unwrap_or_else(|_| toast.inner_size().unwrap_or_default());
         let _ = toast.set_position(PhysicalPosition::new(
-            position.x + size.width as i32 - 316,
-            position.y + size.height as i32 - 86,
+            position.x + (size.width as i32 - toast_size.width as i32) / 2,
+            position.y + size.height as i32 / 4,
         ));
     }
+    let toast_generation = Arc::clone(&state.toast_generation);
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(2550));
-        let _ = toast.close();
+        // Build the WebView while hidden so its first paint cannot flash as an empty frame.
+        // The static page has no network work; this short warm-up is enough for its CSS to load.
+        std::thread::sleep(std::time::Duration::from_millis(450));
+        if toast_generation.load(Ordering::SeqCst) != generation {
+            let _ = toast.close();
+            return;
+        }
+        let _ = toast.show();
+        // Keep the host only for the CSS animation (2.55 s), then close it immediately.
+        std::thread::sleep(std::time::Duration::from_millis(2700));
+        if toast_generation.load(Ordering::SeqCst) == generation {
+            let _ = toast.close();
+        }
     });
     Ok(())
 }
@@ -242,7 +262,7 @@ async fn save_reference_inner(
         .lock()
         .map_err(|_| "Reference lock failed.".to_string())? = Some(text);
     if show_toast {
-        show_reference_toast(app)?;
+        show_reference_toast(app, state)?;
     }
     Ok(())
 }

@@ -1,0 +1,16 @@
+.preview-body {
+  gap: 10px;
+}
+.compare-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.key-hint {
+  color: #89958d;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+}

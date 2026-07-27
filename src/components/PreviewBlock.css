@@ -1,0 +1,36 @@
+.preview-block label,
+.full-diff label {
+  color: #7b887f;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+}
+.preview-block {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid #e0e5de;
+  background: #fffefa;
+}
+.preview-block.accent {
+  border-color: #cddbcf;
+  background: #fbfdf9;
+}
+pre {
+  margin: 0;
+  overflow: hidden;
+  color: #526057;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-code);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-relaxed);
+}
+.preview-block pre {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+}

@@ -1,0 +1,80 @@
+.combination-panel {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+.combination-panel .catalog-heading {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e9e3;
+}
+.combination-panel .catalog-heading .ant-btn {
+  display: inline-flex;
+  height: 25px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+}
+.combination-panel .catalog-heading .ant-btn:hover {
+  background: #6c8871 !important;
+}
+.combination-panel .ant-list {
+  max-height: none;
+  flex: 1;
+}
+.combination-panel .ant-list.combination-list-empty {
+  border-top: 0;
+}
+.combination-editor-page {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px;
+  color: #334039;
+  background: #f5f6f2;
+}
+.combination-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.combination-editor-heading > .ant-btn {
+  margin: -3px 0 0 -5px;
+  color: #637268;
+}
+.combination-editor-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.combination-editor-heading .ant-typography {
+  color: #47574c;
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+}
+.combination-editor-heading span {
+  color: #7d8981;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-relaxed);
+}
+.combination-editor-form {
+  min-height: 0;
+}
+.combination-editor-form .ant-form-item {
+  margin-bottom: 14px;
+}
+.combination-editor-form .ant-form-item-label {
+  padding-bottom: 4px;
+}
+.combination-editor-form .ant-form-item-label > label {
+  color: #647269;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+.combination-editor-page .action-bar {
+  margin-top: auto;
+  padding: 11px 0 0;
+}

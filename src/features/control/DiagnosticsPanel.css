@@ -1,0 +1,69 @@
+.diagnostics-panel {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 10px;
+}
+.diagnostics-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #7d8981;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-relaxed);
+}
+.diagnostics-intro .ant-typography {
+  color: #596a5e;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.diagnostics-list {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  border-top: 1px solid #e5e9e3;
+}
+.diagnostic-event {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 2px;
+  border-bottom: 1px solid #edf0ea;
+}
+.diagnostic-event time {
+  color: #929c94;
+  font-family: var(--font-code);
+  font-size: var(--font-size-micro);
+  line-height: var(--line-height-normal);
+}
+.diagnostic-event div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.diagnostic-event strong {
+  overflow: hidden;
+  color: #536258;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diagnostic-event span {
+  overflow: hidden;
+  color: #8b968e;
+  font-family: var(--font-code);
+  font-size: var(--font-size-micro);
+  line-height: var(--line-height-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diagnostic-event.error strong {
+  color: #a35f54;
+}

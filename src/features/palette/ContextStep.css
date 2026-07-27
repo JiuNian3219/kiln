@@ -1,0 +1,101 @@
+.field-label {
+  color: #7b887f;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+}
+.draft-line {
+  overflow: hidden;
+  padding: 8px 10px;
+  border: 1px solid #e0e5de;
+  color: #4d5a51;
+  background: #fffefa;
+  font-family: var(--font-code);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reference-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 9px;
+  border: 1px solid #dce5d9;
+  border-left: 3px solid #9caf94;
+  background: #f8faf6;
+  color: #58675d;
+  font-size: var(--font-size-caption);
+}
+.reference-context > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.reference-context label {
+  color: #6e816f;
+  font-size: var(--font-size-micro);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+}
+.reference-context span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reference-context .ant-checkbox-wrapper {
+  color: #59685e;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+.reference-context .ant-btn {
+  min-width: 22px;
+  padding: 0 4px;
+  color: #748276;
+}
+.reference-context-guidance {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 126px minmax(0, 1fr);
+  gap: 6px;
+  padding-top: 7px;
+  border-top: 1px solid #e1e8dd;
+}
+.reference-context-guidance .ant-select,
+.reference-context-guidance .ant-input {
+  min-width: 0;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.field-row .ant-select {
+  min-width: 0;
+}
+.context-body {
+  gap: 0;
+  padding-bottom: 0;
+}
+.context-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 12px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.context-scroll::-webkit-scrollbar {
+  display: none;
+}
+.context-body .action-bar {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 12px 0;
+  background: #f5f6f2;
+}

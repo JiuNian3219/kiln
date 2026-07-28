@@ -8,7 +8,7 @@ use std::time::Instant;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindow,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -32,6 +32,9 @@ use settings::{
     feature_enabled, knowledge_base_index_candidates, knowledge_base_index_material,
     save_generated_knowledge_base_index, shortcut_for, validate_shortcut,
 };
+
+const PREVIEW_WINDOW_SIZE: LogicalSize<f64> = LogicalSize::new(560.0, 430.0);
+const CONTROL_PANEL_WINDOW_SIZE: LogicalSize<f64> = LogicalSize::new(760.0, 620.0);
 
 struct AppState {
     diagnostics: Diagnostics,
@@ -161,9 +164,12 @@ fn show_preview(
     payload: PreviewPayload,
 ) -> std::result::Result<(), String> {
     window
-        .emit("selection-captured", payload)
+        .set_size(PREVIEW_WINDOW_SIZE)
         .map_err(|error| error.to_string())?;
     window.center().map_err(|error| error.to_string())?;
+    window
+        .emit("selection-captured", payload)
+        .map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())
 }
@@ -1026,7 +1032,7 @@ async fn generate_knowledge_base_index(
 async fn test_provider_connection(provider: &ModelProvider) -> std::result::Result<String, String> {
     let api_key = WindowsCredentialStore::load_for(&provider.id)?;
     let client = provider::client(std::time::Duration::from_secs(20))?;
-    let content = provider::text(
+    let message = provider::complete(
         &client,
         provider,
         &api_key,
@@ -1034,11 +1040,21 @@ async fn test_provider_connection(provider: &ModelProvider) -> std::result::Resu
             serde_json::json!({"role":"system","content":"Reply with exactly OK."}),
             serde_json::json!({"role":"user","content":"OK"}),
         ],
-        16,
+        None,
+        // Reasoning-capable models may use a small part of their completion
+        // budget before producing visible text. Keep this probe short while
+        // still leaving room for the required visible reply.
+        96,
         false,
     )
     .await?;
-    Ok(content)
+    let content = message
+        .get("content")
+        .and_then(serde_json::Value::as_str)
+        .filter(|content| !content.trim().is_empty());
+    Ok(content
+        .map(str::to_owned)
+        .unwrap_or_else(|| "服务已响应，但该模型本次未返回可见文本。".to_string()))
 }
 
 fn provider_id_from_name(name: &str, existing: &[ModelProvider]) -> String {
@@ -1190,10 +1206,28 @@ fn show_settings(app: &AppHandle) -> std::result::Result<(), String> {
         .get_webview_window("main")
         .ok_or_else(|| "Settings window is unavailable.".to_string())?;
     window
+        .set_size(CONTROL_PANEL_WINDOW_SIZE)
+        .map_err(|error| error.to_string())?;
+    window.center().map_err(|error| error.to_string())?;
+    window
         .emit("settings-opened", payload)
         .map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_main_window_layout(layout: String, app: AppHandle) -> std::result::Result<(), String> {
+    let size = match layout.as_str() {
+        "preview" => PREVIEW_WINDOW_SIZE,
+        "control" => CONTROL_PANEL_WINDOW_SIZE,
+        _ => return Err("Unsupported window layout.".to_string()),
+    };
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Main window is unavailable.".to_string())?;
+    window.set_size(size).map_err(|error| error.to_string())?;
+    window.center().map_err(|error| error.to_string())
 }
 
 fn main() {
@@ -1245,6 +1279,7 @@ fn main() {
             analyze_session,
             generate_replacement,
             hide_main_window,
+            set_main_window_layout,
             get_diagnostics,
             clear_diagnostics,
             report_client_diagnostic,

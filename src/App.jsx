@@ -136,7 +136,10 @@ function App() {
         event.preventDefault();
         acceptReplacement();
       }
-      if (event.key === 'Tab' && phase === 'preview' && !detailsOpen) {
+      const focusedControl =
+        event.target instanceof Element &&
+        event.target.closest('button, input, textarea, select, [role="button"]');
+      if (event.key === 'Tab' && phase === 'preview' && !detailsOpen && !focusedControl) {
         event.preventDefault();
         setDetailsOpen((open) => !open);
       }
@@ -226,6 +229,7 @@ function App() {
       setSettingsNotice('');
       setFeatureErrors({});
       setCanReturnToPalette(true);
+      await invoke('set_main_window_layout', { layout: 'control' });
       setView('control');
     } catch (error) {
       setStatus(`无法打开控制面板：${error}`);
@@ -321,9 +325,10 @@ function App() {
         busy={settingsBusy}
         notice={settingsNotice}
         canReturn={canReturnToPalette}
-        onBack={() => {
+        onBack={async () => {
           setSettingsNotice('');
           setCanReturnToPalette(false);
+          await invoke('set_main_window_layout', { layout: 'preview' });
           setView('palette');
         }}
         onClose={() => invoke('hide_main_window')}

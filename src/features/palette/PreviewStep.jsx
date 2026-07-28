@@ -15,6 +15,13 @@ export function PreviewStep({
 }) {
   return (
     <section className="palette-body preview-body">
+      <div className="preview-heading">
+        <div>
+          <span>替换预览</span>
+          <h1>确认建议文本</h1>
+        </div>
+        <p>确认后将通过原生粘贴替换选区，可使用 Ctrl+Z 撤销。</p>
+      </div>
       <div className="compare-grid">
         <PreviewBlock label="原文" text={original} />
         <PreviewBlock label="建议" text={replacement} accent />

@@ -2,35 +2,36 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
 }
 .catalog-heading .ant-typography {
-  color: #647269;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
 }
 .control-panel .ant-list {
   max-height: 275px;
   overflow: auto;
-  border-top: 1px solid #e5e9e3;
+  border-top: 1px solid var(--color-border);
 }
 .control-panel .ant-list-item {
-  border-bottom-color: #e5e9e3;
+  min-height: 48px;
+  border-bottom-color: var(--color-border);
 }
 .control-panel .ant-list-item-meta-title {
-  color: #4b594f;
+  color: var(--color-text);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
 }
 .control-panel .ant-list-item-meta-description {
   overflow: hidden;
   max-width: 360px;
-  color: #8b968e;
-  font-size: var(--font-size-micro);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .control-panel .ant-empty-description {
-  color: #8b968e;
+  color: var(--color-text-subtle);
   font-size: var(--font-size-caption);
 }

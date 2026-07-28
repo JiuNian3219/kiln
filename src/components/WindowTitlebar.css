@@ -1,12 +1,12 @@
 .palette-titlebar {
   display: flex;
-  height: 34px;
-  flex: 0 0 34px;
+  height: 36px;
+  flex: 0 0 36px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 0 12px;
-  border-bottom: 1px solid #e5e8e2;
-  background: #fbfcf9;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
   user-select: none;
 }
 .palette-drag-region {
@@ -26,15 +26,18 @@
   gap: 1px;
 }
 .app-mark {
-  color: #78877d;
-  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
 }
 .palette-titlebar .ant-btn {
-  color: #708078;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--color-text-muted);
 }
 .palette-titlebar .ant-btn:hover {
-  color: #4a5a51;
-  background: #eef2ec;
+  color: var(--color-text);
+  background: var(--color-subtle);
 }

@@ -9,9 +9,9 @@
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
   overflow: auto;
-  padding: 0 2px 12px 0;
+  padding: 0 2px var(--space-3) 0;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -22,27 +22,27 @@
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--space-1);
 }
 .feature-section > .ant-typography {
-  color: #596a5e;
+  color: var(--color-text);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
 }
 .feature-section > span {
-  color: #849087;
+  color: var(--color-text-subtle);
   font-size: var(--font-size-micro);
   line-height: var(--line-height-normal);
 }
 .feature-switches {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 8px 9px;
+  gap: var(--space-2) 9px;
   align-items: center;
-  padding: 8px 0 2px;
+  padding: var(--space-2) 0 2px;
 }
 .feature-switches label {
-  color: #536258;
+  color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
 }
@@ -52,24 +52,24 @@
   gap: 4px;
 }
 .feature-label .anticon {
-  color: #9ba69d;
+  color: var(--color-text-subtle);
   font-size: var(--font-size-caption);
   cursor: help;
   transition: color 120ms ease;
 }
 .feature-label .anticon:hover {
-  color: #6e8e76;
+  color: var(--color-primary);
 }
 .reference-capture-settings {
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
   padding: 7px 0 2px;
 }
 .reference-capture-settings > label,
 .shortcut-field > label {
-  color: #647269;
+  color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
 }
@@ -78,13 +78,13 @@
 }
 .shortcut-fields {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 3px;
 }
 .shortcut-field {
   display: grid;
   grid-template-columns: 108px minmax(0, 1fr);
-  column-gap: 8px;
+  column-gap: var(--space-2);
   align-items: center;
 }
 .shortcut-field small {
@@ -94,35 +94,35 @@
   line-height: var(--line-height-tight);
 }
 .shortcut-warning {
-  color: #aa7a3b;
+  color: var(--color-warning);
 }
 .shortcut-error {
-  color: #b76358;
+  color: var(--color-danger);
 }
 .shortcut-field .ant-input {
   cursor: default;
   font-family: var(--font-code);
 }
 .shortcut-field .ant-input.shortcut-capturing {
-  border-color: #78967d !important;
-  color: #58735f !important;
-  background: #f6faf4 !important;
-  box-shadow: 0 0 0 2px rgba(120, 150, 125, 0.13) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary-hover) !important;
+  background: var(--color-primary-subtle) !important;
+  box-shadow: 0 0 0 2px rgba(111, 144, 120, 0.2) !important;
 }
 .shortcut-capture-hint {
   margin-top: 3px;
-  color: #aa7a3b;
+  color: var(--color-warning);
   font-size: var(--font-size-micro);
   line-height: var(--line-height-normal);
 }
 .shortcut-capture-hint.active {
-  color: #6e8e76;
+  color: var(--color-primary);
 }
 .storage-section {
   margin: 0 -1px;
-  padding: 9px 1px 8px;
-  border-top: 1px solid #e5e9e3;
-  background: #f5f6f2;
+  padding: 9px 1px var(--space-2);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-subtle);
 }
 .storage-section .action-bar {
   margin-top: 8px;

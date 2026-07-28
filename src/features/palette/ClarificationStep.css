@@ -7,8 +7,8 @@
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -18,24 +18,35 @@
 .question-body .action-bar {
   flex: 0 0 auto;
   margin-top: 0;
-  padding: 12px 0;
-  background: #f5f6f2;
+  padding: var(--space-3) 0;
+  background: var(--color-canvas);
 }
 .step-hint {
-  color: #84998a;
+  color: var(--color-primary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
 }
-.question-body h2 {
+.clarification-heading {
+  display: grid;
+  gap: var(--space-1);
+}
+.clarification-heading h1 {
   margin: 0;
-  color: #39483e;
+  color: var(--color-text);
   font-size: var(--font-size-heading);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-normal);
   overflow-wrap: anywhere;
 }
+.clarification-heading p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-normal);
+}
 .question-body .ant-radio-wrapper {
-  color: #546259;
+  min-height: 28px;
+  color: var(--color-text);
   font-size: var(--font-size-body);
   white-space: normal;
   overflow-wrap: anywhere;

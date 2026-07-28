@@ -1,15 +1,39 @@
+.session-step-heading {
+  display: grid;
+  gap: 2px;
+}
+.session-step-heading > span {
+  color: var(--color-primary);
+  font-size: var(--font-size-micro);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+}
+.session-step-heading h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-normal);
+}
+.session-step-heading p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-normal);
+}
 .field-label {
-  color: #7b887f;
+  color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
 }
 .draft-line {
   overflow: hidden;
-  padding: 8px 10px;
-  border: 1px solid #e0e5de;
-  color: #4d5a51;
-  background: #fffefa;
+  padding: var(--space-2) 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-elevated);
   font-family: var(--font-code);
   font-size: var(--font-size-body);
   line-height: var(--line-height-normal);
@@ -19,13 +43,14 @@
 .reference-context {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
   padding: 7px 9px;
-  border: 1px solid #dce5d9;
-  border-left: 3px solid #9caf94;
-  background: #f8faf6;
-  color: #58675d;
+  border: 1px solid var(--color-border-strong);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary-subtle);
+  color: var(--color-text-muted);
   font-size: var(--font-size-caption);
 }
 .reference-context > div {
@@ -35,7 +60,7 @@
   gap: 3px;
 }
 .reference-context label {
-  color: #6e816f;
+  color: var(--color-primary-hover);
   font-size: var(--font-size-micro);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.05em;
@@ -46,22 +71,22 @@
   white-space: nowrap;
 }
 .reference-context .ant-checkbox-wrapper {
-  color: #59685e;
+  color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 .reference-context .ant-btn {
   min-width: 22px;
   padding: 0 4px;
-  color: #748276;
+  color: var(--color-text-muted);
 }
 .reference-context-guidance {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: 126px minmax(0, 1fr);
-  gap: 6px;
+  gap: var(--space-2);
   padding-top: 7px;
-  border-top: 1px solid #e1e8dd;
+  border-top: 1px solid var(--color-border-strong);
 }
 .reference-context-guidance .ant-select,
 .reference-context-guidance .ant-input {
@@ -70,7 +95,7 @@
 .field-row {
   display: grid;
   grid-template-columns: 74px 1fr;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
 }
 .field-row .ant-select {
@@ -85,8 +110,8 @@
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -96,6 +121,6 @@
 .context-body .action-bar {
   flex: 0 0 auto;
   margin-top: 0;
-  padding: 12px 0;
-  background: #f5f6f2;
+  padding: var(--space-3) 0;
+  background: var(--color-canvas);
 }

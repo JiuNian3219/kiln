@@ -105,19 +105,6 @@ export function ControlPanel({
             ),
           },
           {
-            key: 'features',
-            label: '功能和快捷键',
-            children: (
-              <FeatureAndShortcutPanel
-                key={featureSettingsKey}
-                settings={data}
-                busy={busy}
-                errors={featureErrors}
-                onSave={onFeatureShortcutSave}
-              />
-            ),
-          },
-          {
             key: 'model',
             label: 'AI 服务',
             children: (
@@ -156,6 +143,19 @@ export function ControlPanel({
                 onDelete={(id) => onDelete('delete_knowledge_base', id, '知识库')}
                 onGenerateKnowledgeBaseIndex={onGenerateKnowledgeBaseIndex}
                 onSpecifyKnowledgeBaseIndex={onSpecifyKnowledgeBaseIndex}
+              />
+            ),
+          },
+          {
+            key: 'features',
+            label: '功能与快捷键',
+            children: (
+              <FeatureAndShortcutPanel
+                key={featureSettingsKey}
+                settings={data}
+                busy={busy}
+                errors={featureErrors}
+                onSave={onFeatureShortcutSave}
               />
             ),
           },

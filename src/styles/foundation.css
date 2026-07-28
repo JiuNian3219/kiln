@@ -2,19 +2,48 @@
   --font-ui: 'Microsoft YaHei UI', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   --font-code: 'Cascadia Mono', Consolas, monospace;
   --font-size-micro: 10px;
-  --font-size-caption: 11px;
-  --font-size-body: 12px;
-  --font-size-section: 13px;
-  --font-size-heading: 15px;
+  --font-size-caption: 12px;
+  --font-size-body: 13px;
+  --font-size-section: 14px;
+  --font-size-heading: 16px;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
   --line-height-tight: 1.3;
   --line-height-normal: 1.45;
-  --line-height-relaxed: 1.5;
-  color: #334039;
-  background: #f5f6f2;
+  --line-height-relaxed: 1.55;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --radius-control: 4px;
+  --radius-surface: 6px;
+  --radius-dialog: 8px;
+  --color-canvas: #f4f5f1;
+  --color-subtle: #eef0eb;
+  --color-surface: #fcfcf9;
+  --color-elevated: #ffffff;
+  --color-border: #d9ded6;
+  --color-border-strong: #bbc5b9;
+  --color-text: #29352e;
+  --color-text-muted: #647168;
+  --color-text-subtle: #8b958d;
+  --color-primary: #6f9078;
+  --color-primary-hover: #5f7d68;
+  --color-primary-subtle: #e8f0e8;
+  --color-info: #6e91a5;
+  --color-success: #5d8a68;
+  --color-warning: #b4813f;
+  --color-danger: #b65e55;
+  --color-danger-subtle: #f8eae7;
+  --color-scrim: rgba(32, 42, 36, 0.28);
+  --shadow-menu: 0 4px 12px rgba(32, 42, 36, 0.1);
+  --shadow-float: 0 8px 24px rgba(32, 42, 36, 0.1);
+  color: var(--color-text);
+  background: var(--color-canvas);
   font-family: var(--font-ui);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
@@ -34,7 +63,7 @@ body,
 }
 body {
   margin: 0;
-  background: #f5f6f2;
+  background: var(--color-canvas);
 }
 button,
 input,
@@ -44,7 +73,8 @@ textarea {
 
 /* Ant Design controls share a single quiet desktop theme. */
 .ant-btn {
-  border-radius: 5px;
+  min-height: 32px;
+  border-radius: var(--radius-control);
   box-shadow: none !important;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
@@ -54,77 +84,89 @@ textarea {
     color 120ms ease;
 }
 .ant-btn-default {
-  border-color: #dce2da;
-  color: #5b685f;
-  background: #fbfcf9;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
 }
 .ant-btn-default:hover {
-  border-color: #bfcbbd !important;
-  color: #46554b !important;
-  background: #f3f6f1 !important;
+  border-color: var(--color-border-strong) !important;
+  color: var(--color-text) !important;
+  background: var(--color-subtle) !important;
 }
 .ant-btn-primary {
-  color: #fffefa;
-  border-color: #78967d;
-  background: #78967d;
+  color: #fff;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
 }
 .ant-btn-primary:hover {
-  color: #fffefa !important;
-  border-color: #6c8871 !important;
-  background: #6c8871 !important;
+  color: #fff !important;
+  border-color: var(--color-primary-hover) !important;
+  background: var(--color-primary-hover) !important;
 }
 .ant-btn-primary:disabled,
 .ant-btn-primary:disabled:hover {
-  color: #a2aaa3 !important;
-  border-color: #e0e5df !important;
-  background: #edf0eb !important;
+  color: #9aa39c !important;
+  border-color: #dde2dc !important;
+  background: #e9ece7 !important;
 }
 .ant-checkbox-inner {
-  border-color: #bfc9bd !important;
-  background: #fffefa !important;
+  border-color: var(--color-border-strong) !important;
+  background: var(--color-elevated) !important;
 }
 .ant-checkbox-checked .ant-checkbox-inner {
-  border-color: #78967d !important;
-  background: #78967d !important;
+  border-color: var(--color-primary) !important;
+  background: var(--color-primary) !important;
 }
 .ant-select-selector,
 .ant-input,
 .ant-input-affix-wrapper {
-  border-color: #dbe1d9 !important;
-  color: #3e4b43 !important;
-  background: #fffefa !important;
+  min-height: 32px !important;
+  border-color: var(--color-border) !important;
+  border-radius: var(--radius-control) !important;
+  color: var(--color-text) !important;
+  background: var(--color-elevated) !important;
   box-shadow: none !important;
 }
 .ant-select-selection-placeholder,
 .ant-input::placeholder {
-  color: #a1aaa2 !important;
+  color: var(--color-text-subtle) !important;
 }
 .ant-select-arrow,
 .ant-input-password-icon {
-  color: #89958d !important;
+  color: var(--color-text-subtle) !important;
 }
 .ant-select-dropdown {
-  border: 1px solid #dfe4dc;
-  background: #fffefa;
-  box-shadow: 0 3px 12px rgba(52, 64, 57, 0.08);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-menu);
 }
 .ant-select-item,
 .ant-select-selection-item {
-  color: #49574e !important;
+  color: var(--color-text) !important;
 }
 .ant-select-item-option-active,
 .ant-select-item-option-selected {
-  background: #eff3ed !important;
+  background: var(--color-primary-subtle) !important;
 }
 .ant-select-selection-overflow-item .ant-select-selection-item {
   border: 0;
-  background: #edf2eb;
+  background: var(--color-primary-subtle);
 }
 .ant-popconfirm .ant-popover-inner {
-  background: #fffefa;
-  box-shadow: 0 4px 14px rgba(52, 64, 57, 0.11);
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-menu);
 }
 .ant-popconfirm .ant-popover-message-title,
 .ant-popconfirm .ant-popover-description {
-  color: #4d5a51;
+  color: var(--color-text);
+}
+
+.ant-btn:focus-visible,
+.ant-input:focus-visible,
+.ant-input-affix-wrapper:focus-visible,
+.ant-select-focused .ant-select-selector {
+  outline: 0;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(111, 144, 120, 0.28) !important;
 }

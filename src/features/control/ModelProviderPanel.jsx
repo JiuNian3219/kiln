@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Checkbox, Empty, Form, Input, List, Popconfirm, Select, Typography } from 'antd';
+import { Button, Empty, Form, Input, List, Popconfirm, Select, Typography } from 'antd';
 import { ArrowLeftOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { ActionBar } from '../../components/ActionBar';
 import './ModelProviderPanel.css';
@@ -94,12 +94,19 @@ export function ModelProviderPanel({ payload, busy, onSave, onDelete, onSetDefau
                 </>
               }
             />
-            <Checkbox
-              checked={payload.settings.defaultModelProvider === provider.id}
-              disabled={busy}
-              aria-label="选择此 AI 服务"
-              onChange={(event) => event.target.checked && onSetDefault(provider.id)}
-            />
+            {payload.settings.defaultModelProvider === provider.id ? (
+              <span className="default-resource-label">默认</span>
+            ) : (
+              <Button
+                type="text"
+                size="small"
+                disabled={busy}
+                aria-label={`设 ${provider.name} 为默认 AI 服务`}
+                onClick={() => onSetDefault(provider.id)}
+              >
+                设为默认
+              </Button>
+            )}
           </List.Item>
         )}
       />

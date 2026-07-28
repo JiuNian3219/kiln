@@ -1,6 +1,6 @@
 .preview-block label,
 .full-diff label {
-  color: #7b887f;
+  color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
@@ -9,19 +9,20 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 7px;
-  padding: 10px;
-  border: 1px solid #e0e5de;
-  background: #fffefa;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
 }
 .preview-block.accent {
-  border-color: #cddbcf;
-  background: #fbfdf9;
+  border-color: var(--color-border-strong);
+  background: var(--color-primary-subtle);
 }
 pre {
   margin: 0;
   overflow: hidden;
-  color: #526057;
+  color: var(--color-text-muted);
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--font-code);

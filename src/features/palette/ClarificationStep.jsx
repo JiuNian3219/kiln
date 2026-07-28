@@ -18,7 +18,10 @@ export function ClarificationStep({
         <div className="step-hint">
           需要补充信息 · {questionIndex + 1}/{questionCount}
         </div>
-        <h2>{question.prompt}</h2>
+        <div className="clarification-heading">
+          <h1>{question.prompt}</h1>
+          <p>选择一个接近的选项，或直接补充你的答案。</p>
+        </div>
         {question.options?.length ? (
           <Radio.Group
             value={answers[question.id]?.choice}

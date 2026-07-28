@@ -20,6 +20,11 @@ export function ContextStep({ context, original, busy, onChange, onClearReferenc
   return (
     <section className="palette-body context-body">
       <div className="context-scroll">
+        <div className="session-step-heading">
+          <span>本次增强</span>
+          <h1>选择本次使用的上下文</h1>
+          <p>仅在本次生成中使用；未选择组合时采用通用增强。</p>
+        </div>
         {context.referenceText && (
           <div className="reference-context">
             <div>
@@ -66,8 +71,10 @@ export function ContextStep({ context, original, busy, onChange, onClearReferenc
             )}
           </div>
         )}
-        <label className="field-label">当前草稿</label>
-        <div className="draft-line">{preview(original, 120) || '等待读取选区…'}</div>
+        <div className="draft-preview-field">
+          <label className="field-label">当前草稿</label>
+          <div className="draft-line">{preview(original, 120) || '等待读取选区…'}</div>
+        </div>
         <div className="field-row">
           <label>工作组合</label>
           <Select

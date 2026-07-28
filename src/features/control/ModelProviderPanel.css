@@ -16,13 +16,13 @@
 }
 .model-provider-panel .catalog-heading span,
 .provider-editor-heading span {
-  color: #849087;
+  color: var(--color-text-subtle);
   font-size: var(--font-size-caption);
 }
 .model-provider-panel .catalog-heading {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
   padding-bottom: 6px;
-  border-bottom: 1px solid #e5e9e3;
+  border-bottom: 1px solid var(--color-border);
 }
 .model-provider-panel .catalog-heading .ant-btn {
   display: inline-flex;
@@ -32,18 +32,18 @@
   padding: 0 9px;
 }
 .model-provider-panel .catalog-heading .ant-btn:hover {
-  background: #6c8871 !important;
+  background: var(--color-primary-hover) !important;
 }
 .provider-list .ant-list-item {
   align-items: center;
 }
 .provider-list .ant-list-item-meta-title {
-  color: #4c5b51;
+  color: var(--color-text);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
 }
 .provider-list .ant-list-item-meta-description {
-  color: #879188;
+  color: var(--color-text-subtle);
   font-size: var(--font-size-caption);
 }
 .provider-list .ant-tag {
@@ -51,9 +51,16 @@
   border: 0;
   font-size: var(--font-size-micro);
 }
-.provider-list .ant-checkbox-wrapper {
-  color: #67756c;
+.default-resource-label {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--color-primary-hover);
+  background: var(--color-primary-subtle);
   font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 .provider-editor-heading {
@@ -68,9 +75,9 @@
 .deepseek-preset {
   align-self: flex-start;
   margin: 0 0 8px;
-  border-color: #c9d7c9;
-  color: #577760;
-  background: #f0f6ed;
+  border-color: var(--color-border-strong);
+  color: var(--color-primary-hover);
+  background: var(--color-primary-subtle);
 }
 .provider-editor-form {
   min-height: 0;
@@ -90,7 +97,7 @@
   padding-bottom: 3px;
 }
 .provider-editor-form .ant-form-item-label > label {
-  color: #647269;
+  color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
 }
@@ -98,5 +105,5 @@
   flex: 0 0 auto;
   margin-top: auto;
   padding: 10px 0 8px;
-  background: #f5f6f2;
+  background: var(--color-subtle);
 }

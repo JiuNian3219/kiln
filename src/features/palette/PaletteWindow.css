@@ -4,74 +4,74 @@
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  color: #334039;
-  background: #f5f6f2;
+  color: var(--color-text);
+  background: var(--color-canvas);
 }
 .palette-status {
   display: flex;
-  min-height: 38px;
+  min-height: 36px;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid #eef0eb;
-  color: #65746a;
-  background: #fafbf8;
-  font-size: var(--font-size-body);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-subtle);
+  font-size: var(--font-size-caption);
 }
 .palette-body {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--space-3);
+  padding: var(--space-3);
   overflow: hidden;
 }
 .diff-modal .ant-modal-content {
-  border: 1px solid #dce2da;
-  border-radius: 6px;
-  background: #fffefa;
-  box-shadow: 0 8px 24px rgba(52, 64, 57, 0.1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-dialog);
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-float);
 }
 .diff-modal .ant-modal-header {
-  border-bottom-color: #e7ebe5;
-  background: #fffefa;
+  border-bottom-color: var(--color-border);
+  background: var(--color-elevated);
 }
 .diff-modal .ant-modal-title,
 .diff-modal .ant-modal-close {
-  color: #435148;
+  color: var(--color-text);
 }
 .diff-modal .ant-modal-footer {
-  border-top-color: #e7ebe5;
+  border-top-color: var(--color-border);
 }
 .full-diff {
   display: grid;
   height: 236px;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--space-2);
 }
 .full-diff > div {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--space-2);
 }
 .full-diff pre {
   width: 100%;
   height: 100%;
   min-width: 0;
-  padding: 8px;
+  padding: var(--space-2);
   overflow: auto;
   overflow-wrap: anywhere;
   word-break: break-word;
-  border: 1px solid #e0e5de;
-  background: #fafbf8;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 .full-diff textarea {
   height: 196px !important;
   overflow: auto !important;
-  color: #4a584f !important;
+  color: var(--color-text) !important;
   font-family: var(--font-code);
   font-size: var(--font-size-body);
   line-height: var(--line-height-relaxed);

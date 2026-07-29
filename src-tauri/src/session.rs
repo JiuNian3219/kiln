@@ -33,4 +33,6 @@ pub struct ClarificationQuestion {
 #[serde(rename_all = "camelCase")]
 pub struct ClarificationPayload {
     pub questions: Vec<ClarificationQuestion>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replacement: Option<String>,
 }

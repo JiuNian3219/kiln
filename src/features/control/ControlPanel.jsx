@@ -41,6 +41,7 @@ export function ControlPanel({
     shortcuts: data.shortcuts,
     referenceShortcut: data.referenceShortcut,
     referenceCaptureMode: data.referenceCaptureMode,
+    knowledgeBaseInlineTokenLimit: data.knowledgeBaseInlineTokenLimit,
   });
   const titlebar = (
     <header className="palette-titlebar">

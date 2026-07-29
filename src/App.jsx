@@ -159,7 +159,19 @@ function App() {
         setQuestionIndex(0);
         setPhase('questions');
         setStatus('补充一项必要信息。');
-      } else await generateReplacement(false);
+      } else if (result.replacement?.trim()) {
+        setReplacement(result.replacement);
+        setPhase('preview');
+        setStatus('检查结果后确认替换。');
+        updateContext({
+          referenceText: null,
+          referenceActive: false,
+          referenceContextType: 'background',
+          referenceContextNote: '',
+        });
+      } else {
+        setStatus('分析结果缺少替换文本，请重试。');
+      }
     } catch (error) {
       setStatus(`分析失败：${error}`);
     } finally {

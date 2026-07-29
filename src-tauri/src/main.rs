@@ -30,7 +30,8 @@ use settings::{
     FeatureAndShortcutSettings, ModelProvider, ModelProviderInput, Settings, SettingsPayload,
     SettingsRepository, active_model_provider, discover_catalog, discover_knowledge_bases,
     feature_enabled, knowledge_base_index_candidates, knowledge_base_index_material,
-    save_generated_knowledge_base_index, shortcut_for, validate_shortcut,
+    save_generated_knowledge_base_index, shortcut_for, valid_knowledge_base_inline_token_limit,
+    validate_shortcut,
 };
 
 const PREVIEW_WINDOW_SIZE: LogicalSize<f64> = LogicalSize::new(560.0, 430.0);
@@ -574,6 +575,7 @@ async fn analyze_session(
             Some(&session.id),
             serde_json::json!({
                 "questionCount": payload.questions.len(),
+                "directReplacement": payload.replacement.is_some(),
                 "durationMs": started.elapsed().as_millis(),
             }),
         ),
@@ -583,6 +585,16 @@ async fn analyze_session(
             "E-ANALYZE-001",
             serde_json::json!({ "durationMs": started.elapsed().as_millis() }),
         ),
+    }
+    if result
+        .as_ref()
+        .ok()
+        .and_then(|payload| payload.replacement.as_ref())
+        .is_some()
+        && let Ok(mut pending) = state.pending.lock()
+        && let Some(pending) = pending.as_mut()
+    {
+        pending.reference_text = None;
     }
     result
 }
@@ -686,6 +698,7 @@ fn get_feature_and_shortcut_settings(
         shortcuts: settings.shortcuts.clone(),
         reference_shortcut: settings.reference_shortcut.clone(),
         reference_capture_mode: settings.reference_capture_mode.clone(),
+        knowledge_base_inline_token_limit: settings.knowledge_base_inline_token_limit,
     })
 }
 
@@ -714,6 +727,12 @@ fn save_feature_and_shortcut_settings(
     if reference_enabled && let Err(error) = validate_shortcut(&input.reference_shortcut) {
         field_errors.insert("referenceShortcut".to_string(), error);
     }
+    if !valid_knowledge_base_inline_token_limit(input.knowledge_base_inline_token_limit) {
+        field_errors.insert(
+            "knowledgeBaseInlineTokenLimit".to_string(),
+            "直接注入上限必须介于 500 到 8000 tokens。".to_string(),
+        );
+    }
     if !field_errors.is_empty() {
         return Ok(FeatureAndShortcutSaveResult {
             success: false,
@@ -733,6 +752,7 @@ fn save_feature_and_shortcut_settings(
     } else {
         "selection".to_string()
     };
+    settings.knowledge_base_inline_token_limit = input.knowledge_base_inline_token_limit;
     settings.allow_network = feature_enabled(&settings, "network-search");
     reregister_shortcuts(&app, &settings)?;
     SettingsRepository::save(&settings)?;
@@ -747,6 +767,7 @@ fn save_feature_and_shortcut_settings(
             shortcuts: settings.shortcuts.clone(),
             reference_shortcut: settings.reference_shortcut.clone(),
             reference_capture_mode: settings.reference_capture_mode.clone(),
+            knowledge_base_inline_token_limit: settings.knowledge_base_inline_token_limit,
         },
     })
 }

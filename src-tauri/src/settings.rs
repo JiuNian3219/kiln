@@ -24,6 +24,8 @@ pub struct Settings {
     pub default_combination: String,
     #[serde(default)]
     pub knowledge_base_indexes: HashMap<String, KnowledgeBaseIndex>,
+    #[serde(default = "default_knowledge_base_inline_token_limit")]
+    pub knowledge_base_inline_token_limit: u32,
     #[serde(default)]
     pub allow_network: bool,
     #[serde(default = "default_reference_shortcut")]
@@ -91,6 +93,8 @@ pub struct FeatureAndShortcutSettings {
     pub reference_shortcut: String,
     #[serde(default = "default_reference_capture_mode")]
     pub reference_capture_mode: String,
+    #[serde(default = "default_knowledge_base_inline_token_limit")]
+    pub knowledge_base_inline_token_limit: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -112,6 +116,17 @@ pub struct CombinationInput {
 
 fn default_reference_shortcut() -> String {
     "Ctrl+Shift+T".to_string()
+}
+
+pub const MIN_KNOWLEDGE_BASE_INLINE_TOKEN_LIMIT: u32 = 500;
+pub const MAX_KNOWLEDGE_BASE_INLINE_TOKEN_LIMIT: u32 = 8_000;
+
+pub fn default_knowledge_base_inline_token_limit() -> u32 {
+    2_500
+}
+
+pub fn valid_knowledge_base_inline_token_limit(value: u32) -> bool {
+    (MIN_KNOWLEDGE_BASE_INLINE_TOKEN_LIMIT..=MAX_KNOWLEDGE_BASE_INLINE_TOKEN_LIMIT).contains(&value)
 }
 
 fn default_deepseek_model() -> String {
@@ -241,6 +256,7 @@ impl Default for Settings {
             combinations: Vec::new(),
             default_combination: String::new(),
             knowledge_base_indexes: HashMap::new(),
+            knowledge_base_inline_token_limit: default_knowledge_base_inline_token_limit(),
             allow_network: false,
             reference_shortcut: default_reference_shortcut(),
             reference_capture_mode: default_reference_capture_mode(),
@@ -438,6 +454,54 @@ pub fn read_knowledge_base_index(settings: &Settings, id: &str) -> Result<String
         _ => knowledge_base_file(settings, id, "INDEX.md")?,
     };
     read_bounded_text(&path, "knowledge base index")
+}
+
+#[derive(Clone, Debug)]
+pub struct KnowledgeBaseTextDocument {
+    pub relative_path: String,
+    pub content: String,
+}
+
+/// Reads a complete small, selected knowledge base only after proving that all
+/// readable text fits the host-owned file and byte limits. `None` means that
+/// the caller must use the index plus read-only retrieval instead.
+pub fn read_small_knowledge_base_documents(
+    settings: &Settings,
+    id: &str,
+    max_files: usize,
+    max_total_bytes: u64,
+) -> Result<Option<Vec<KnowledgeBaseTextDocument>>, String> {
+    let candidates = knowledge_base_index_candidates(settings, id)?;
+    if candidates.len() > max_files {
+        return Ok(None);
+    }
+
+    let mut total_bytes = 0_u64;
+    let mut paths = Vec::with_capacity(candidates.len());
+    for relative_path in candidates {
+        let path = knowledge_base_file(settings, id, &relative_path)?;
+        let bytes = fs::metadata(&path)
+            .map_err(|error| error.to_string())?
+            .len();
+        total_bytes = total_bytes.saturating_add(bytes);
+        if total_bytes > max_total_bytes {
+            return Ok(None);
+        }
+        paths.push((relative_path, path));
+    }
+
+    paths
+        .into_iter()
+        .map(|(relative_path, path)| {
+            fs::read_to_string(path)
+                .map(|content| KnowledgeBaseTextDocument {
+                    relative_path,
+                    content,
+                })
+                .map_err(|error| error.to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 pub fn knowledge_base_index_candidates(

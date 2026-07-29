@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Select, Switch, Tooltip, Typography } from 'antd';
+import { Button, Input, InputNumber, Select, Switch, Tooltip, Typography } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { ActionBar } from '../../components/ActionBar';
 import { invoke } from '../../lib/tauri';
@@ -23,6 +23,10 @@ const asShortcutSettings = (settings) => ({
   shortcuts: { ...shortcutDefaults, ...(settings.shortcuts || {}) },
   referenceShortcut: settings.referenceShortcut || 'Ctrl+Shift+T',
   referenceCaptureMode: settings.referenceCaptureMode === 'clipboard' ? 'clipboard' : 'selection',
+  knowledgeBaseInlineTokenLimit: Math.min(
+    8000,
+    Math.max(500, Number(settings.knowledgeBaseInlineTokenLimit) || 2500),
+  ),
 });
 
 export function FeatureAndShortcutPanel({ settings, busy, errors, onSave }) {
@@ -206,6 +210,34 @@ export function FeatureAndShortcutPanel({ settings, busy, errors, onSave }) {
               {waitingFor ? '正在录入快捷键：按下组合键，或按 Esc 取消。' : captureMessage}
             </div>
           )}
+        </div>
+        <div className="feature-section">
+          <Text>知识库加速</Text>
+          <span>小型知识库会完整附带到本次请求；超过上限时改为索引与按需读取。</span>
+          <div className="knowledge-context-limit">
+            <label htmlFor="knowledge-base-inline-token-limit">直接上下文上限</label>
+            <div className="knowledge-context-input">
+              <InputNumber
+                id="knowledge-base-inline-token-limit"
+                size="small"
+                min={500}
+                max={8000}
+                step={250}
+                value={draft.knowledgeBaseInlineTokenLimit}
+                status={errors?.knowledgeBaseInlineTokenLimit ? 'error' : undefined}
+                onChange={(value) =>
+                  setDraft((current) => ({
+                    ...current,
+                    knowledgeBaseInlineTokenLimit: Number(value) || 0,
+                  }))
+                }
+              />
+              <span>tokens</span>
+            </div>
+            {errors?.knowledgeBaseInlineTokenLimit && (
+              <small className="knowledge-context-limit-error">{errors.knowledgeBaseInlineTokenLimit}</small>
+            )}
+          </div>
         </div>
       </div>
       <div className="feature-section storage-section">

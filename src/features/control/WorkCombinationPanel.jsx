@@ -5,6 +5,7 @@ import { ActionBar } from '../../components/ActionBar';
 import './WorkCombinationPanel.css';
 
 const { Text } = Typography;
+const GENERAL_ENHANCEMENT_AGENT_ID = '__general_enhancement__';
 const generalCombination = {
   id: '',
   name: '通用增强',
@@ -15,6 +16,10 @@ const generalCombination = {
 
 export function CombinationPanel({ payload, busy, onOpenEditor, onEdit, onDelete, onSetDefault }) {
   const combinations = [generalCombination, ...(payload.settings.combinations || [])];
+  const agentName = (agentId) =>
+    agentId === GENERAL_ENHANCEMENT_AGENT_ID
+      ? '通用增强'
+      : payload.agents.find((agent) => agent.id === agentId)?.name || agentId;
   return (
     <section className="combination-panel">
       <div className="catalog-heading">
@@ -91,7 +96,7 @@ export function CombinationPanel({ payload, busy, onOpenEditor, onEdit, onDelete
               description={
                 item.isBuiltIn
                   ? '不使用 Agent 或知识库，使用内置任务增强。'
-                  : `Agent：${item.agentId} · 知识库：${item.knowledgeBaseIds.length} 个`
+                  : `Agent：${agentName(item.agentId)} · 知识库：${item.knowledgeBaseIds.length} 个`
               }
             />
           </List.Item>
@@ -108,7 +113,10 @@ export function CombinationEditorPage({ payload, combination, busy, onBack, onSa
     agentId: combination?.agentId || '',
     knowledgeBaseIds: combination?.knowledgeBaseIds || [],
   }));
-  const agents = payload.agents.map((item) => ({ value: item.id, label: item.name }));
+  const agents = [
+    { value: GENERAL_ENHANCEMENT_AGENT_ID, label: '通用增强（内置）' },
+    ...payload.agents.map((item) => ({ value: item.id, label: item.name })),
+  ];
   const knowledgeBases = payload.knowledgeBases
     .filter((item) => item.indexStatus !== '缺少 INDEX')
     .map((item) => ({ value: item.id, label: item.name }));

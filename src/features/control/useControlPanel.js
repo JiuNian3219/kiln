@@ -1,0 +1,198 @@
+import { useEffect, useState } from 'react';
+import { chooseDirectories, chooseMarkdownFile, invoke, listen } from '../../lib/tauri';
+
+const asPanelPayload = (payload) => ({ ...payload, settings: { ...payload.settings } });
+
+export function useControlPanel(setView, setPaletteStatus) {
+  const [settings, setSettings] = useState(null);
+  const [settingsNotice, setSettingsNotice] = useState('');
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [canReturnToPalette, setCanReturnToPalette] = useState(false);
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [featureErrors, setFeatureErrors] = useState({});
+
+  useEffect(() => {
+    let unlisten;
+    listen('settings-opened', ({ payload }) => {
+      setSettings(asPanelPayload(payload));
+      setSettingsNotice('');
+      setFeatureErrors({});
+      setCanReturnToPalette(false);
+      setDiagnostics(null);
+      setView('control');
+    }).then((handler) => {
+      unlisten = handler;
+    });
+    return () => unlisten?.();
+  }, [setView]);
+
+  async function openControl() {
+    try {
+      setSettings(asPanelPayload(await invoke('get_settings')));
+      setSettingsNotice('');
+      setFeatureErrors({});
+      setCanReturnToPalette(true);
+      await invoke('set_main_window_layout', { layout: 'control' });
+      setView('control');
+    } catch (error) {
+      setPaletteStatus(`无法打开控制面板：${error}`);
+    }
+  }
+  async function refreshDiagnostics(notice = '') {
+    setSettingsBusy(true);
+    try {
+      setDiagnostics(await invoke('get_diagnostics'));
+      if (notice) setSettingsNotice(notice);
+    } catch (error) {
+      setSettingsNotice(`无法读取诊断日志：${error}`);
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+  async function clearDiagnostics() {
+    setSettingsBusy(true);
+    try {
+      setDiagnostics(await invoke('clear_diagnostics'));
+      setSettingsNotice('本地诊断日志已清除。');
+    } catch (error) {
+      setSettingsNotice(`无法清除诊断日志：${error}`);
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+  async function copyDiagnostics() {
+    if (!diagnostics?.report) return;
+    try {
+      await navigator.clipboard.writeText(diagnostics.report);
+      setSettingsNotice('诊断摘要已复制，可随 Bug 报告一并发送。');
+    } catch (error) {
+      setSettingsNotice(`无法复制诊断摘要：${error}`);
+    }
+  }
+  async function saveFeatureAndShortcutSettings(input) {
+    setSettingsBusy(true);
+    setFeatureErrors({});
+    try {
+      const result = await invoke('save_feature_and_shortcut_settings', { input });
+      if (!result.success) {
+        setFeatureErrors(result.fieldErrors || {});
+        setSettingsNotice('请修正标红的快捷键后重新保存。');
+        return;
+      }
+      setSettings((current) => ({
+        ...current,
+        settings: {
+          ...current.settings,
+          ...result.settings,
+          allowNetwork: Boolean(result.settings.featureToggles?.['network-search']),
+        },
+      }));
+      setSettingsNotice('功能与快捷键已保存并立即生效。');
+    } catch (error) {
+      setSettingsNotice(`无法保存功能与快捷键：${error}`);
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+  async function refreshSettings(action, notice) {
+    setSettingsBusy(true);
+    try {
+      setSettings(asPanelPayload(await action()));
+      setSettingsNotice(notice);
+      return true;
+    } catch (error) {
+      setSettingsNotice(`操作失败：${error}`);
+      return false;
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+  async function importAgent() {
+    const sourcePath = await chooseMarkdownFile('选择 Agent Markdown 文件');
+    if (typeof sourcePath === 'string')
+      await refreshSettings(() => invoke('import_agent', { sourcePath }), 'Agent 已导入。');
+  }
+  async function importKnowledgeBases() {
+    const selected = await chooseDirectories('选择一个或多个知识库文件夹');
+    const sourcePaths = Array.isArray(selected) ? selected : selected ? [selected] : [];
+    if (sourcePaths.length)
+      await refreshSettings(
+        () => invoke('import_knowledge_bases', { sourcePaths }),
+        `已导入 ${sourcePaths.length} 个知识库。`,
+      );
+  }
+  const onBack = async () => {
+    setSettingsNotice('');
+    setCanReturnToPalette(false);
+    await invoke('set_main_window_layout', { layout: 'preview' });
+    setView('palette');
+  };
+  return {
+    settings,
+    openControl,
+    panelProps: settings && {
+      payload: settings,
+      busy: settingsBusy,
+      notice: settingsNotice,
+      canReturn: canReturnToPalette,
+      onBack,
+      onClose: () => invoke('hide_main_window'),
+      onImportAgent: importAgent,
+      onImportKnowledgeBases: importKnowledgeBases,
+      onDelete: (command, id, label) => refreshSettings(() => invoke(command, { id }), `${label} 已删除。`),
+      onSaveCombination: (input) =>
+        refreshSettings(() => invoke('save_combination', { input }), '组合已保存。'),
+      onDeleteCombination: (id) =>
+        refreshSettings(() => invoke('delete_combination', { id }), '组合已删除。'),
+      onSetDefaultCombination: (id) =>
+        refreshSettings(() => invoke('set_default_combination', { id }), '默认组合已更新。'),
+      onGenerateKnowledgeBaseIndex: (id) =>
+        refreshSettings(
+          () => invoke('generate_knowledge_base_index', { id }),
+          'AI 索引已生成并保存到应用私有目录。',
+        ),
+      onSpecifyKnowledgeBaseIndex: async (id) => {
+        try {
+          const candidates = await invoke('get_knowledge_base_index_candidates', { id });
+          const selected = window.prompt(
+            `请输入索引文件的相对路径：\n${candidates.join('\n')}`,
+            candidates.find((item) => item.toLowerCase() === 'index.md') || candidates[0] || '',
+          );
+          if (selected)
+            await refreshSettings(
+              () => invoke('set_knowledge_base_index', { id, mode: 'manual', manualPath: selected }),
+              '已手动指定知识库索引。',
+            );
+        } catch (error) {
+          setSettingsNotice(`无法读取知识库文件：${error}`);
+        }
+      },
+      onSaveModelProvider: (input) =>
+        refreshSettings(() => invoke('save_model_provider', { input }), 'AI 服务已保存。'),
+      onDeleteModelProvider: (id) =>
+        refreshSettings(() => invoke('delete_model_provider', { id }), 'AI 服务已删除。'),
+      onSetDefaultModelProvider: (id) =>
+        refreshSettings(
+          () => invoke('set_default_model_provider', { id }),
+          'AI 服务选择已保存，将用于增强。',
+        ),
+      onTestModelProvider: async (id) => {
+        setSettingsBusy(true);
+        try {
+          setSettingsNotice(`API 测试成功：${await invoke('test_model_provider', { id })}`);
+        } catch (error) {
+          setSettingsNotice(`API 测试失败：${error}`);
+        } finally {
+          setSettingsBusy(false);
+        }
+      },
+      diagnostics,
+      onOpenDiagnostics: refreshDiagnostics,
+      onRefreshDiagnostics: () => refreshDiagnostics('诊断日志已刷新。'),
+      onCopyDiagnostics: copyDiagnostics,
+      onClearDiagnostics: clearDiagnostics,
+      featureErrors,
+      onFeatureShortcutSave: saveFeatureAndShortcutSettings,
+    },
+  };
+}

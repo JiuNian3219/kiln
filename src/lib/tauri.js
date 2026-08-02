@@ -12,6 +12,9 @@ export const clearReference = () => invoke('clear_reference');
 
 export const listen = (event, handler) => tauri.event.listen(event, handler);
 
+export const reportClientDiagnostic = (kind, errorType) =>
+  invoke('report_client_diagnostic', { kind, errorType });
+
 export const chooseDirectory = (title) => open({ title, directory: true, multiple: false });
 export const chooseDirectories = (title) => open({ title, directory: true, multiple: true });
 export const chooseMarkdownFile = (title) =>

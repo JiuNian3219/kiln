@@ -1,12 +1,33 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Button, Spin, Tabs } from 'antd';
 import { ArrowLeftOutlined, CloseOutlined } from '@ant-design/icons';
-import { FeatureAndShortcutPanel } from './FeatureAndShortcutPanel';
-import { ModelProviderPanel } from './ModelProviderPanel';
 import { CombinationEditorPage, CombinationPanel } from './WorkCombinationPanel';
-import { CatalogPanel } from './CatalogPanel';
-import { DiagnosticsPanel } from './DiagnosticsPanel';
 import './ControlPanel.css';
+
+const ModelProviderPanel = lazy(async () => {
+  const module = await import('./ModelProviderPanel');
+  return { default: module.ModelProviderPanel };
+});
+const CatalogPanel = lazy(async () => {
+  const module = await import('./CatalogPanel');
+  return { default: module.CatalogPanel };
+});
+const FeatureAndShortcutPanel = lazy(async () => {
+  const module = await import('./FeatureAndShortcutPanel');
+  return { default: module.FeatureAndShortcutPanel };
+});
+const DiagnosticsPanel = lazy(async () => {
+  const module = await import('./DiagnosticsPanel');
+  return { default: module.DiagnosticsPanel };
+});
+
+function TabLoading() {
+  return (
+    <div className="control-notice">
+      <Spin size="small" /> 正在加载页面…
+    </div>
+  );
+}
 
 export function ControlPanel({
   payload,
@@ -28,6 +49,7 @@ export function ControlPanel({
   onSetDefaultModelProvider,
   onTestModelProvider,
   diagnostics,
+  onOpenDiagnostics,
   onRefreshDiagnostics,
   onCopyDiagnostics,
   onClearDiagnostics,
@@ -88,6 +110,9 @@ export function ControlPanel({
       </div>
       <Tabs
         size="small"
+        onChange={(key) => {
+          if (key === 'diagnostics') onOpenDiagnostics();
+        }}
         items={[
           {
             key: 'combinations',
@@ -109,68 +134,78 @@ export function ControlPanel({
             key: 'model',
             label: 'AI 服务',
             children: (
-              <ModelProviderPanel
-                payload={payload}
-                busy={busy}
-                onSave={onSaveModelProvider}
-                onDelete={onDeleteModelProvider}
-                onSetDefault={onSetDefaultModelProvider}
-                onTest={onTestModelProvider}
-              />
+              <Suspense fallback={<TabLoading />}>
+                <ModelProviderPanel
+                  payload={payload}
+                  busy={busy}
+                  onSave={onSaveModelProvider}
+                  onDelete={onDeleteModelProvider}
+                  onSetDefault={onSetDefaultModelProvider}
+                  onTest={onTestModelProvider}
+                />
+              </Suspense>
             ),
           },
           {
             key: 'agents',
             label: 'Agent',
             children: (
-              <CatalogPanel
-                label="Agent"
-                items={payload.agents}
-                busy={busy}
-                onImport={onImportAgent}
-                onDelete={(id) => onDelete('delete_agent', id, 'Agent')}
-              />
+              <Suspense fallback={<TabLoading />}>
+                <CatalogPanel
+                  label="Agent"
+                  items={payload.agents}
+                  busy={busy}
+                  onImport={onImportAgent}
+                  onDelete={(id) => onDelete('delete_agent', id, 'Agent')}
+                />
+              </Suspense>
             ),
           },
           {
             key: 'knowledge',
             label: '知识库',
             children: (
-              <CatalogPanel
-                label="知识库"
-                items={payload.knowledgeBases}
-                busy={busy}
-                onImport={onImportKnowledgeBases}
-                onDelete={(id) => onDelete('delete_knowledge_base', id, '知识库')}
-                onGenerateKnowledgeBaseIndex={onGenerateKnowledgeBaseIndex}
-                onSpecifyKnowledgeBaseIndex={onSpecifyKnowledgeBaseIndex}
-              />
+              <Suspense fallback={<TabLoading />}>
+                <CatalogPanel
+                  label="知识库"
+                  items={payload.knowledgeBases}
+                  busy={busy}
+                  onImport={onImportKnowledgeBases}
+                  onDelete={(id) => onDelete('delete_knowledge_base', id, '知识库')}
+                  onGenerateKnowledgeBaseIndex={onGenerateKnowledgeBaseIndex}
+                  onSpecifyKnowledgeBaseIndex={onSpecifyKnowledgeBaseIndex}
+                />
+              </Suspense>
             ),
           },
           {
             key: 'features',
             label: '功能与快捷键',
             children: (
-              <FeatureAndShortcutPanel
-                key={featureSettingsKey}
-                settings={data}
-                busy={busy}
-                errors={featureErrors}
-                onSave={onFeatureShortcutSave}
-              />
+              <Suspense fallback={<TabLoading />}>
+                <FeatureAndShortcutPanel
+                  key={featureSettingsKey}
+                  settings={data}
+                  busy={busy}
+                  errors={featureErrors}
+                  onSave={onFeatureShortcutSave}
+                />
+              </Suspense>
             ),
           },
           {
             key: 'diagnostics',
             label: '诊断与日志',
             children: (
-              <DiagnosticsPanel
-                diagnostics={diagnostics}
-                busy={busy}
-                onRefresh={onRefreshDiagnostics}
-                onCopy={onCopyDiagnostics}
-                onClear={onClearDiagnostics}
-              />
+              <Suspense fallback={<TabLoading />}>
+                <DiagnosticsPanel
+                  diagnostics={diagnostics}
+                  busy={busy}
+                  onRefresh={onRefreshDiagnostics}
+                  onCopy={onCopyDiagnostics}
+                  onClear={onClearDiagnostics}
+                />
+              </Suspense>
             ),
           },
         ]}

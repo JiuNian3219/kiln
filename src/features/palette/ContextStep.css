@@ -1,31 +1,11 @@
-.session-step-heading {
-  display: grid;
-  gap: 2px;
-}
-.session-step-heading > span {
-  color: var(--color-primary);
-  font-size: var(--font-size-micro);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.06em;
-}
-.session-step-heading h1 {
-  margin: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-heading);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-normal);
-}
-.session-step-heading p {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-normal);
-}
 .field-label {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  color: var(--color-text);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .draft-line {
   overflow: hidden;
@@ -42,10 +22,10 @@
 }
 .reference-context {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: var(--space-2);
-  align-items: center;
-  padding: 7px 9px;
+  grid-template-columns: minmax(92px, 1fr) minmax(0, 4fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border-strong);
   border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-control);
@@ -53,49 +33,56 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
 }
-.reference-context > div {
+.reference-context-content {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-2);
 }
-.reference-context label {
-  color: var(--color-primary-hover);
-  font-size: var(--font-size-micro);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.05em;
+.reference-context-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
 }
-.reference-context span {
+.reference-context-summary > span {
   overflow: hidden;
+  flex: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.reference-context .ant-checkbox-wrapper {
+.reference-context-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+.reference-context-actions .ant-checkbox-wrapper {
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   white-space: nowrap;
 }
-.reference-context .ant-btn {
+.reference-context-actions .ant-btn {
   min-width: 22px;
   padding: 0 4px;
   color: var(--color-text-muted);
 }
 .reference-context-guidance {
   display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: 126px minmax(0, 1fr);
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 4fr);
   gap: var(--space-2);
-  padding-top: 7px;
+  padding-top: var(--space-2);
   border-top: 1px solid var(--color-border-strong);
 }
 .reference-context-guidance .ant-select,
 .reference-context-guidance .ant-input {
   min-width: 0;
 }
+.context-field,
 .field-row {
   display: grid;
-  grid-template-columns: 74px 1fr;
-  gap: var(--space-2);
+  grid-template-columns: minmax(92px, 1fr) minmax(0, 4fr);
+  gap: var(--space-3);
   align-items: center;
 }
 .field-row .ant-select {

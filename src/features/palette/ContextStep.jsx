@@ -6,7 +6,7 @@ const GENERAL_ENHANCEMENT_VALUE = '__general_enhancement__';
 const referenceContextOptions = [
   { value: 'background', label: '背景资料' },
   { value: 'previous-ai-conversation', label: '先前的 AI 对话' },
-  { value: 'external-material', label: '外部资料 / 文档' },
+  { value: 'external-material', label: '外部文档' },
   { value: 'custom', label: '自定义说明' },
 ];
 const referenceContextNotes = {
@@ -20,63 +20,62 @@ export function ContextStep({ context, original, busy, onChange, onClearReferenc
   return (
     <section className="palette-body context-body">
       <div className="context-scroll">
-        <div className="session-step-heading">
-          <span>本次增强</span>
-          <h1>选择本次使用的上下文</h1>
-          <p>仅在本次生成中使用；未选择组合时采用通用增强。</p>
-        </div>
         {context.referenceText && (
           <div className="reference-context">
-            <div>
-              <label>参考上下文</label>
-              <span>{preview(context.referenceText, 80)}</span>
-            </div>
-            <Checkbox
-              checked={context.referenceActive}
-              disabled={busy}
-              onChange={(event) => onChange({ referenceActive: event.target.checked })}
-            >
-              作为参考附带
-            </Checkbox>
-            <Button type="text" size="small" aria-label="清除参考上下文" onClick={onClearReference}>
-              ×
-            </Button>
-            {context.referenceActive && (
-              <div className="reference-context-guidance">
-                <Select
-                  size="small"
-                  value={context.referenceContextType}
-                  options={referenceContextOptions}
-                  disabled={busy}
-                  aria-label="参考上下文用途"
-                  onChange={(value) =>
-                    onChange({
-                      referenceContextType: value,
-                      referenceContextNote:
-                        referenceContextNotes[value] ||
-                        (value === 'background' ? '' : context.referenceContextNote),
-                    })
-                  }
-                />
-                <Input
-                  size="small"
-                  value={context.referenceContextNote}
-                  disabled={busy}
-                  maxLength={500}
-                  aria-label="参考上下文说明"
-                  placeholder="可补充说明它与当前草稿的关系"
-                  onChange={(event) => onChange({ referenceContextNote: event.target.value })}
-                />
+            <label className="field-label">参考上下文</label>
+            <div className="reference-context-content">
+              <div className="reference-context-summary">
+                <span>{preview(context.referenceText, 80)}</span>
+                <div className="reference-context-actions">
+                  <Checkbox
+                    checked={context.referenceActive}
+                    disabled={busy}
+                    onChange={(event) => onChange({ referenceActive: event.target.checked })}
+                  >
+                    作为参考附带
+                  </Checkbox>
+                  <Button type="text" size="small" aria-label="清除参考上下文" onClick={onClearReference}>
+                    ×
+                  </Button>
+                </div>
               </div>
-            )}
+              {context.referenceActive && (
+                <div className="reference-context-guidance">
+                  <Select
+                    size="small"
+                    value={context.referenceContextType}
+                    options={referenceContextOptions}
+                    disabled={busy}
+                    aria-label="参考上下文用途"
+                    onChange={(value) =>
+                      onChange({
+                        referenceContextType: value,
+                        referenceContextNote:
+                          referenceContextNotes[value] ||
+                          (value === 'background' ? '' : context.referenceContextNote),
+                      })
+                    }
+                  />
+                  <Input
+                    size="small"
+                    value={context.referenceContextNote}
+                    disabled={busy}
+                    maxLength={500}
+                    aria-label="参考上下文说明"
+                    placeholder="可补充说明它与当前草稿的关系"
+                    onChange={(event) => onChange({ referenceContextNote: event.target.value })}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
-        <div className="draft-preview-field">
+        <div className="context-field">
           <label className="field-label">当前草稿</label>
           <div className="draft-line">{preview(original, 120) || '等待读取选区…'}</div>
         </div>
         <div className="field-row">
-          <label>工作组合</label>
+          <label className="field-label">工作组合</label>
           <Select
             size="small"
             value={context.selectedCombinationId || GENERAL_ENHANCEMENT_VALUE}

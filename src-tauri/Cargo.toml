@@ -26,3 +26,7 @@ windows = { version = "0.61", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+[profile.release]
+lto = "thin"
+strip = "symbols"

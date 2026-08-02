@@ -1,8 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    process.env.ANALYZE === 'true' &&
+      visualizer({
+        filename: 'dist/bundle-report.html',
+        gzipSize: true,
+        brotliSize: true,
+        open: false,
+      }),
+  ].filter(Boolean),
   clearScreen: false,
   server: {
     host: '127.0.0.1',
@@ -12,6 +22,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: { input: { main: 'index.html', toast: 'toast.html' } },
+    rollupOptions: {
+      input: { main: 'index.html', toast: 'toast.html' },
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+        },
+      },
+    },
   },
 });

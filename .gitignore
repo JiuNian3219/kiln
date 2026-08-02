@@ -2,3 +2,4 @@
 /src-tauri/target-refactor-verify/
 /node_modules/
 /dist/
+/.playwright-cli/

@@ -3,6 +3,7 @@ import { Button, Input, InputNumber, Select, Switch, Tooltip, Typography } from 
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { ActionBar } from '../../components/ActionBar';
 import { invoke } from '../../lib/tauri';
+import { AutostartSetting } from './AutostartSetting';
 import './FeatureAndShortcutPanel.css';
 
 const { Text } = Typography;
@@ -183,6 +184,7 @@ export function FeatureAndShortcutPanel({ settings, busy, errors, onSave }) {
               />
             )}
           </div>
+          <AutostartSetting />
         </div>
         <div className="feature-section">
           <Text>快捷键自定义</Text>

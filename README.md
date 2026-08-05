@@ -11,6 +11,8 @@ npm ci
 npm run tauri:dev
 ```
 
+`tauri:dev` 与直接运行 `cargo run --manifest-path src-tauri/Cargo.toml` 都会在前端资源缺失或过期时自动构建 `dist`。调试窗口加载本地静态资源，不依赖 `127.0.0.1` 开发服务器。
+
 常用命令：
 
 | 命令 | 用途 |

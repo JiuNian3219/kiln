@@ -2,6 +2,7 @@
 //! explicitly selected for a single shortcut session.
 
 mod context;
+mod network;
 mod output;
 mod prompt;
 mod tools;
@@ -19,11 +20,10 @@ use crate::settings::{ModelProvider, Settings, active_model_provider};
 use crate::workspace::ToolScope;
 
 const MAX_AUTOMATIC_RETRIES: u8 = 3;
-const MAX_AGENT_TOOL_ROUNDS: u8 = 6;
+const MAX_AGENT_TOOL_ROUNDS: u8 = 8;
 const MAX_KNOWLEDGE_BASE_LOCAL_TOOL_ROUNDS: u8 = 2;
 const MAX_INLINE_KNOWLEDGE_BASE_FILES: usize = 6;
 const MAX_INLINE_KNOWLEDGE_BASE_BYTES: u64 = 12 * 1024;
-const WEB_FETCH_ENABLED: bool = false;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum KnowledgeBaseDelivery {

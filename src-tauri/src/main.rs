@@ -25,6 +25,11 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 
 fn main() {
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("Codex Input Enhancer")
+                .build(),
+        )
         .manage(AppState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -33,7 +38,12 @@ fn main() {
                 MenuItem::with_id(app, "open-control", "打开控制面板", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let tray_menu = Menu::with_items(app, &[&open_panel, &quit])?;
+            let app_icon = app
+                .default_window_icon()
+                .cloned()
+                .ok_or_else(|| std::io::Error::other("Application icon is unavailable."))?;
             TrayIconBuilder::new()
+                .icon(app_icon)
                 .tooltip("Codex 输入增强器")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)

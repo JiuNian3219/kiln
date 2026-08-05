@@ -1,0 +1,29 @@
+.autostart-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.autostart-setting-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.autostart-setting label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.autostart-setting .anticon {
+  color: var(--color-text-subtle);
+  cursor: help;
+}
+
+.autostart-setting small {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-micro);
+  line-height: var(--line-height-tight);
+}
